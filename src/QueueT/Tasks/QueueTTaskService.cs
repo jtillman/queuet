@@ -87,13 +87,6 @@ namespace QueueT.Tasks
             return message;
         }
 
-        public async Task<bool> HandleMessageAsync(QueueTMessage queueTMessage)
-        {
-            //if (!queueTMessage.Properties.TryGetValue("ContentType", out messageType))
-            await Task.CompletedTask;
-            return false;
-        }
-
         public object[] GetParametersForTask(TaskDefinition taskDefinition, IDictionary<string, object> taskArguments)
         {
             var argumentList = new List<object>(taskDefinition.Parameters.Length);
@@ -124,6 +117,7 @@ namespace QueueT.Tasks
                 throw new ArgumentException($"Task Naame [{message.Name}] is not registered."); // TODO: Make custom exception
 
             var methodClass = _serviceProvider.GetService(taskDefinition.Method.DeclaringType);
+
             var retVal = taskDefinition.Method.Invoke(methodClass, GetParametersForTask(taskDefinition, message.Arguments));
             if (retVal is Task)
             {
