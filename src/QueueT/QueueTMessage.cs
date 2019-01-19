@@ -14,7 +14,7 @@ namespace QueueT
 
         public IDictionary<string, string> Properties { get; set; }
 
-        public byte[] Message { get; set; }
+        public byte[] EncodedBody { get; set; }
 
         public DateTime Created { get; set; }
     }

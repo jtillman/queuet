@@ -78,7 +78,7 @@ namespace QueueT.Tasks
                 ContentType = JsonContentType,
                 Properties = new Dictionary<string, string>(),
                 MessageType = MessageType,
-                Message = serializedMessage,
+                EncodedBody = serializedMessage,
                 Created = DateTime.UtcNow
             };
             

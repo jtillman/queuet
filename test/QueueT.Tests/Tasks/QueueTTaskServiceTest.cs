@@ -146,7 +146,7 @@ namespace QueueT.Tests.Tasks
                     It.Is<QueueTMessage>(m =>
                         m.ContentType == QueueTTaskService.JsonContentType &&
                         m.MessageType == QueueTTaskService.MessageType && 
-                        m.Message.SequenceEqual(serializedArguments))))
+                        m.EncodedBody.SequenceEqual(serializedArguments))))
                     .Returns(Task.CompletedTask)
                     .Verifiable("Message is not being correctly dispatched");
 

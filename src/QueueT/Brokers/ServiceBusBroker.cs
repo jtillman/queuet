@@ -43,43 +43,4 @@ namespace QueueT.Brokers
             await queueClient.SendAsync(serviceBusMessage);
         }
     }
-
-    public static class ServiceBusExtensions
-    {
-        public static QueueTMessage ToQueueTMessage(this Message message)
-        {
-            var properties = new Dictionary<string, string>();
-            var queueTMessage = new QueueTMessage
-            {
-                Id = message.MessageId,
-                ContentType = message.ContentType,
-            };
-
-            queueTMessage.MessageType = message.UserProperties[ServiceBusBroker.MessageTypeProperty] as string;
-
-            foreach (var property in message.UserProperties)
-            {
-                if (message.UserProperties[property.Key] is string value)
-                    queueTMessage.Properties[property.Key] = value;
-            }
-
-            return queueTMessage;
-        }
-
-        public static Message ToServiceBusMessage(this QueueTMessage message)
-        {
-            var serviceBusMessage = new Message(message.Message)
-            {
-                MessageId = message.Id,
-                ContentType = message.ContentType
-            };
-
-            foreach (var property in message.Properties)
-                serviceBusMessage.UserProperties[property.Key] = property.Value;
-
-            serviceBusMessage.UserProperties[ServiceBusBroker.MessageTypeProperty] = message.MessageType;
-
-            return serviceBusMessage;
-        }
-    }
 }
