@@ -14,21 +14,18 @@ namespace QueueT.Brokers
         private Dictionary<string, QueueClient> _senderQueueClients =
             new Dictionary<string, QueueClient>();
 
-        private ServiceBusConnection _connection;
+        private string _connectionString;
 
-        private RetryPolicy _retryPolicy;
-
-        public ServiceBusBroker(ServiceBusConnection connection, RetryPolicy retryPolicy = null)
+        public ServiceBusBroker(string connectionString)
         {
-            _connection = connection ?? throw new ArgumentNullException(nameof(connection));
-            _retryPolicy = retryPolicy ?? RetryPolicy.Default;
+            _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
         }
 
         public QueueClient GetOrCreateQueueClient(string queueName)
         {
             if (!_senderQueueClients.TryGetValue(queueName, out var queueClient))
             {
-                queueClient = new QueueClient(_connection, queueName, ReceiveMode.PeekLock, _retryPolicy);
+                queueClient = new QueueClient(_connectionString, queueName);
                 _senderQueueClients[queueName] = queueClient;
             }
             return queueClient;

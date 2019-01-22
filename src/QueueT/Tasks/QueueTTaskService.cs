@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -20,41 +21,42 @@ namespace QueueT.Tasks
 
         private readonly IQueueTBroker _broker;
 
+        private readonly QueueTTaskOptions _options;
+
         private IDictionary<string, TaskDefinition> TaskDefinitionsByName { get; }
             = new Dictionary<string, TaskDefinition>();
 
         private IDictionary<MethodInfo, TaskDefinition> TaskDefinitionsByMethod { get; }
             = new Dictionary<MethodInfo, TaskDefinition>();
 
-        public QueueTTaskService(ILogger<QueueTTaskService> logger, IServiceProvider serviceProvider, IQueueTBroker broker)
+        public QueueTTaskService(
+            ILogger<QueueTTaskService> logger,
+            IServiceProvider serviceProvider,
+            IQueueTBroker broker,
+            IOptions<QueueTTaskOptions> taskOptions)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
             _broker = broker;
+
+            _options = taskOptions.Value;
+
+            foreach (var taskDefinition in _options.Tasks)
+                AddTask(taskDefinition);
         }
 
-        public TaskDefinition RegisterTask(MethodInfo taskMethod, string name = null, string queueName = null)
+        public void AddTask(TaskDefinition taskDefinition)
         {
-            if (null == taskMethod)
-                throw new ArgumentNullException(nameof(taskMethod));
+            if (taskDefinition == null)
+                throw new ArgumentNullException(nameof(taskDefinition));
 
-            var taskName = name?.Trim();
-            if (string.IsNullOrEmpty(taskName))
-                taskName = taskMethod.GetDefaultTaskNameForMethod();
+            if (TaskDefinitionsByName.ContainsKey(taskDefinition.Name))
+                throw new ArgumentException($"Attempting to add task with duplcate name [{taskDefinition.Name}]");
 
-            if (TaskDefinitionsByName.ContainsKey(taskName))
-                throw new ArgumentException($"Attempting to add task with duplcate name [{taskName}]");
+            _logger.LogInformation($"Registering task: {taskDefinition.Name}");
 
-            _logger.LogInformation($"Registering task: {taskName}");
-
-            queueName = string.IsNullOrWhiteSpace(queueName) ? null : queueName.Trim();
-
-            var definition = new TaskDefinition(taskName, taskMethod, queueName);
-
-            TaskDefinitionsByName.Add(taskName, definition);
-            TaskDefinitionsByMethod.Add(taskMethod, definition);
-
-            return definition;
+            TaskDefinitionsByName.Add(taskDefinition.Name, taskDefinition);
+            TaskDefinitionsByMethod.Add(taskDefinition.Method, taskDefinition);
         }
 
         public async Task<TaskMessage> DispatchAsync(MethodInfo methodInfo, IDictionary<string, object> arguments)
@@ -67,7 +69,7 @@ namespace QueueT.Tasks
 
             var message = new TaskMessage
             {
-                Name = definition.TaskName,
+                Name = definition.Name,
                 Arguments = arguments
             };
 
@@ -81,8 +83,10 @@ namespace QueueT.Tasks
                 EncodedBody = serializedMessage,
                 Created = DateTime.UtcNow
             };
-            
-            await _broker.SendAsync(definition.QueueName, queueTMessage);
+
+            var targetQueue = definition.QueueName ?? _options.DefaultQueueName;
+
+            await _broker.SendAsync(targetQueue, queueTMessage);
 
             return message;
         }
@@ -103,7 +107,7 @@ namespace QueueT.Tasks
             }
 
             if (0 < missingArguments.Count)
-                throw new ArgumentException($"Message for task [{taskDefinition.TaskName}] missing arguments: {string.Join(", ", missingArguments)}");
+                throw new ArgumentException($"Message for task [{taskDefinition.Name}] missing arguments: {string.Join(", ", missingArguments)}");
 
             return argumentList.ToArray();
         }

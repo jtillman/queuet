@@ -1,0 +1,13 @@
+﻿@page
+@inject Microsoft.Extensions.Options.IOptions<QueueT.Tasks.QueueTTaskOptions> taskOptions
+@model IndexModel
+@{
+    ViewData["Title"] = "QueueT Task List";
+}
+
+<ul>
+    @foreach (var taskDefinition in taskOptions.Value.Tasks)
+    {
+        <li>@taskDefinition.Name</li>
+    }
+</ul>

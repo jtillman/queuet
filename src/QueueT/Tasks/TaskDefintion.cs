@@ -4,7 +4,7 @@ namespace QueueT.Tasks
 {
     public class TaskDefinition
     {
-        public string TaskName { get; }
+        public string Name { get; }
 
         public MethodInfo Method { get; }
 
@@ -14,9 +14,19 @@ namespace QueueT.Tasks
 
         public TaskDefinition(string taskName, MethodInfo method, string queueName)
         {
-            TaskName = taskName;
-            Method = method;
-            QueueName = queueName;
+            if (string.IsNullOrWhiteSpace(taskName))
+            {
+                throw new System.ArgumentException("message", nameof(taskName));
+            }
+
+            if (string.IsNullOrWhiteSpace(queueName))
+            {
+                throw new System.ArgumentException("message", nameof(queueName));
+            }
+
+            Name = taskName.Trim();
+            Method = method ?? throw new System.ArgumentNullException(nameof(method));
+            QueueName = queueName.Trim();
             Parameters = method.GetParameters();
         }
     }

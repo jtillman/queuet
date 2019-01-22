@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QueueT", "QueueT\QueueT.csp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QueueT.Tests", "..\test\QueueT.Tests\QueueT.Tests.csproj", "{B9939AA8-E6A4-42F1-B575-BFF686F96203}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AspNetCoreWebApp", "..\sample\AspNetCoreWebApp\AspNetCoreWebApp.csproj", "{FD9F77DB-BB04-4A24-9508-8B76CF8AEFBB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{B9939AA8-E6A4-42F1-B575-BFF686F96203}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B9939AA8-E6A4-42F1-B575-BFF686F96203}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B9939AA8-E6A4-42F1-B575-BFF686F96203}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FD9F77DB-BB04-4A24-9508-8B76CF8AEFBB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FD9F77DB-BB04-4A24-9508-8B76CF8AEFBB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FD9F77DB-BB04-4A24-9508-8B76CF8AEFBB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FD9F77DB-BB04-4A24-9508-8B76CF8AEFBB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

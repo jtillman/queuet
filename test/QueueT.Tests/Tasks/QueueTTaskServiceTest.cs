@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Xunit;
+using Microsoft.Extensions.Options;
 
 namespace QueueT.Tests.Tasks
 {
@@ -34,6 +35,7 @@ namespace QueueT.Tests.Tasks
         Mock<ILogger<QueueTTaskService>> _mockLogger;
         Mock<IServiceProvider> _mockServiceProvider;
         Mock<IQueueTBroker> _mockBroker;
+        Mock<IOptions<QueueTTaskOptions>> _mockOptions;
 
         QueueTTaskService _taskService;
         MethodInfo _syncTestMethod;
@@ -44,68 +46,35 @@ namespace QueueT.Tests.Tasks
             _mockLogger = new Mock<ILogger<QueueTTaskService>>();
             _mockServiceProvider = new Mock<IServiceProvider>();
             _mockBroker = new Mock<IQueueTBroker>();
-            _taskService = new QueueTTaskService(_mockLogger.Object, _mockServiceProvider.Object, _mockBroker.Object);
+            _mockOptions = new Mock<IOptions<QueueTTaskOptions>>();
+
+            _mockOptions.SetupGet(x => x.Value)
+                .Returns(new QueueTTaskOptions());
+
+            _taskService = new QueueTTaskService(
+                _mockLogger.Object,
+                _mockServiceProvider.Object,
+                _mockBroker.Object,
+                _mockOptions.Object);
+
             _syncTestMethod = typeof(TestTaskClass).GetMethod(nameof(TestTaskClass.Multiply));
             _asyncTestMethod = typeof(TestTaskClass).GetMethod(nameof(TestTaskClass.MultiplyAsync));
         }
 
         [Fact]
-        public void RegisterTask_Throws_Null_TaskMethod()
+        public void AddTask_Throws_On_Null_TaskDefinition()
         {
-            Assert.Throws<ArgumentNullException>(() => _taskService.RegisterTask(null, "taskName", "queueName"));
+            Assert.Throws<ArgumentNullException>(() => _taskService.AddTask(null));
         }
 
         [Fact]
-        public void RegisterTask_Throws_On_Duplicate_TaskName()
+        public void AddTask_Throws_On_Duplicate_TaskName()
         {
-            _taskService.RegisterTask(_syncTestMethod);
-            Assert.Throws<ArgumentException>(() => _taskService.RegisterTask(_syncTestMethod));
+            var defintion = new TaskDefinition("task", _syncTestMethod, "queue");
+            _taskService.AddTask(defintion);
+            Assert.Throws<ArgumentException>(() => _taskService.AddTask(defintion));
         }
 
-        [Fact]
-        public void RegisterTask_Correctly_Sets_Method()
-        {
-            var definition = _taskService.RegisterTask(_syncTestMethod);
-            Assert.Equal(_syncTestMethod, definition.Method);
-        }
-
-        [Theory]
-        [InlineData(null)]
-        [InlineData("")]
-        [InlineData("   ")]
-        public void RegisterTask_Correctly_Defaults_TaskName(string taskName)
-        {
-            var definition = _taskService.RegisterTask(_syncTestMethod, taskName);
-            Assert.Equal(_syncTestMethod.GetDefaultTaskNameForMethod(), definition.TaskName);
-        }
-
-        [Theory]
-        [InlineData("mytask", "mytask")]
-        [InlineData(" mytask", "mytask")]
-        [InlineData("mytask ", "mytask")]
-        public void RegisterTask_Correctly_Uses_TaskName(string givenTaskName, string expectedTaskName)
-        {
-            var definition = _taskService.RegisterTask(_syncTestMethod, givenTaskName);
-            Assert.Equal(expectedTaskName, definition.TaskName);
-        }
-
-        [Theory]
-        [InlineData(null)]
-        [InlineData("")]
-        [InlineData("    ")]
-        public void RegisterTask_Correctly_Defaults_QueueName(string queueName)
-        {
-            var definition = _taskService.RegisterTask(_syncTestMethod, queueName: queueName);
-            Assert.Null(definition.QueueName);
-        }
-
-        [Theory]
-        [InlineData("myqueue", "myqueue")]
-        public void RegisterTask_Correctly_Uses_QueueName(string givenQueueName, string expectedQueueName)
-        {
-            var definition = _taskService.RegisterTask(_syncTestMethod, queueName: givenQueueName);
-            Assert.Equal(expectedQueueName, definition.QueueName);
-        }
 
         [Fact]
         public void DispatchAsync_Throws_On_Null_Method()
@@ -125,7 +94,7 @@ namespace QueueT.Tests.Tasks
             var taskName = "MyTask";
             var queueName = "MyQueue";
 
-            var definition = _taskService.RegisterTask(_syncTestMethod, taskName, queueName);
+            _taskService.AddTask(new TaskDefinition(taskName, _syncTestMethod, queueName));
             var arguments = new Dictionary<string, object> { { "left", 5 }, { "right", 8 } };
 
             var serializedArguments = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(
@@ -154,7 +123,7 @@ namespace QueueT.Tests.Tasks
 
             _mockBroker.Verify();
 
-            Assert.Equal(definition.TaskName, message.Name);
+            Assert.Equal(taskName, message.Name);
             Assert.Equal(arguments, message.Arguments);
         }
 
@@ -185,7 +154,7 @@ namespace QueueT.Tests.Tasks
             _mockServiceProvider.Setup(sp => sp.GetService(_syncTestMethod.DeclaringType))
                 .Returns(new TestTaskClass());
 
-            _taskService.RegisterTask(_syncTestMethod, taskName);
+            _taskService.AddTask(new TaskDefinition(taskName, _syncTestMethod, "queue"));
             var result = _taskService.ExecuteTaskMessageAsync(message).Result;
             Assert.Equal(result, expectedResult);
         }
@@ -212,7 +181,7 @@ namespace QueueT.Tests.Tasks
             _mockServiceProvider.Setup(sp => sp.GetService(_asyncTestMethod.DeclaringType))
                 .Returns(new TestTaskClass());
 
-            _taskService.RegisterTask(_asyncTestMethod, taskName);
+            _taskService.AddTask(new TaskDefinition(taskName, _asyncTestMethod, "queue"));
             var result = _taskService.ExecuteTaskMessageAsync(message).Result;
             Assert.Equal(result, expectedResult);
         }
