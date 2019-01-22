@@ -30,13 +30,8 @@ namespace AspNetCoreWebApp
 
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
 
-            services.AddQueueTTasks(new QueueT.Brokers.InMemoryBroker());
-                // .RegisterTaskAttributes(Assembly.GetExecutingAssembly());
-
-            services.Configure<QueueTTaskOptions>(options =>
-            {
-                options.Tasks.Add(new TaskDefinition("LateRegistered", typeof(Tasks.ComplexCalculator).GetMethod("Add"), "default"));
-            });
+            services.AddQueueTTasks(new QueueT.Brokers.InMemoryBroker(), "default")
+                .RegisterTaskAttributes(Assembly.GetExecutingAssembly());
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
