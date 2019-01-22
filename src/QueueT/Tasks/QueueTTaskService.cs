@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -59,7 +60,26 @@ namespace QueueT.Tasks
             TaskDefinitionsByMethod.Add(taskDefinition.Method, taskDefinition);
         }
 
-        public async Task<TaskMessage> DispatchAsync(MethodInfo methodInfo, IDictionary<string, object> arguments)
+        public async Task<TaskMessage> DelayAsync<T>(Expression<Action<T>> expression) => await _DelayAsync(expression?.Body as MethodCallExpression);
+
+        public async Task<TaskMessage> DelayAsync<T>(Expression<Func<T, Task>> expression) => await _DelayAsync(expression?.Body as MethodCallExpression);
+
+        private async Task<TaskMessage> _DelayAsync(MethodCallExpression methodExpression)
+        {
+            if (null == methodExpression)
+                throw new ArgumentException("Expression must be a method call");
+
+            if (!TaskDefinitionsByMethod.TryGetValue(methodExpression.Method, out var taskDefinition))
+            {
+                throw new ArgumentException("Method is not registered task");
+            }
+
+            var definition = GetForMethod(methodExpression.Method);
+            var arguments = definition.CreateArgumentsFromCall(methodExpression);
+            return await DispatchAsync(definition, arguments);
+        }
+
+        internal TaskDefinition GetForMethod(MethodInfo methodInfo)
         {
             if (methodInfo == null)
                 throw new ArgumentNullException(nameof(methodInfo));
@@ -67,6 +87,22 @@ namespace QueueT.Tasks
             if (!TaskDefinitionsByMethod.TryGetValue(methodInfo, out TaskDefinition definition))
                 throw new ArgumentException($"Method [{methodInfo.Name}] must be registered before dispatching."); // TODO: Make custom exception
 
+            return definition;
+        }
+
+        public async Task<TaskMessage> DelayAsync(MethodInfo methodInfo, IDictionary<string, object> arguments)
+        {
+            if (methodInfo == null)
+                throw new ArgumentNullException(nameof(methodInfo));
+
+            if (!TaskDefinitionsByMethod.TryGetValue(methodInfo, out TaskDefinition definition))
+                throw new ArgumentException($"Method [{methodInfo.Name}] must be registered before dispatching."); // TODO: Make custom exception
+
+            return await DispatchAsync(definition, arguments);
+        }
+
+        internal async Task<TaskMessage> DispatchAsync(TaskDefinition definition, IDictionary<string, object> arguments)
+        {
             var message = new TaskMessage
             {
                 Name = definition.Name,
@@ -90,6 +126,7 @@ namespace QueueT.Tasks
 
             return message;
         }
+
 
         public object[] GetParametersForTask(TaskDefinition taskDefinition, IDictionary<string, object> taskArguments)
         {
@@ -122,15 +159,13 @@ namespace QueueT.Tasks
 
             var methodClass = _serviceProvider.GetService(taskDefinition.Method.DeclaringType);
 
-            var retVal = taskDefinition.Method.Invoke(methodClass, GetParametersForTask(taskDefinition, message.Arguments));
+            var retVal = taskDefinition.Method.Invoke(methodClass, taskDefinition.GetParametersFromArguments(message.Arguments));
             if (retVal is Task)
             {
                 var retTask = retVal as Task;
                 var resultProperty = retTask.GetType().GetProperty("Result");
                 await retTask;
-                retVal = resultProperty != null ?
-                    resultProperty.GetValue(retVal) :
-                    null;
+                retVal = resultProperty?.GetValue(retVal);
             }
             return retVal;
         }

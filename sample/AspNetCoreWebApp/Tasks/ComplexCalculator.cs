@@ -4,13 +4,13 @@ namespace AspNetCoreWebApp.Tasks
 {
     public class ComplexCalculator
     {
-        [QueuedTask(TaskName = "Multiply")]
+        [QueuedTask]
         public int Multiply(int right, int left) => right * left;
 
-        [QueuedTask(TaskName = "Add")]
+        [QueuedTask]
         public int Add(int right, int left) => right + left;
 
-        [QueuedTask(TaskName = "Substract")]
+        [QueuedTask(TaskName = "SubstractTask")]
         public int Substract(int right, int left) => right - left;
     }
 }

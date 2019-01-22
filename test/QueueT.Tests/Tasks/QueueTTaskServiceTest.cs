@@ -77,19 +77,54 @@ namespace QueueT.Tests.Tasks
 
 
         [Fact]
-        public void DispatchAsync_Throws_On_Null_Method()
+        public void DelayAsync_Throws_On_Null_Method()
         {
-            Assert.ThrowsAsync<ArgumentNullException>(async () => await _taskService.DispatchAsync(null, null));
+            Assert.ThrowsAsync<ArgumentNullException>(async () => await _taskService.DelayAsync(null, null));
         }
 
         [Fact]
-        public void DispatchAsync_Throws_When_Not_Registered()
+        public void DelayAsync_Throws_When_Not_Registered()
         {
-            Assert.ThrowsAsync<ArgumentException>(async () => await _taskService.DispatchAsync(_syncTestMethod, null));
+            Assert.ThrowsAsync<ArgumentException>(async () => await _taskService.DelayAsync(_syncTestMethod, null));
         }
 
         [Fact]
-        public void DispatchAsync_Correctly_Uses_Dispatcher()
+        public void DelayAsync_With_Expression_Dispatches_Correctly()
+        {
+            var taskName = "task";
+            var queueName = "queue";
+            var left = 5;
+            var right = 6;
+
+            var serializedArguments = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(
+                new {
+                    name = taskName,
+                    arguments = new {
+                        left,
+                        right
+                    }
+                }));
+
+            var definition = new TaskDefinition(taskName, _syncTestMethod, queueName);
+
+            _mockBroker.Setup(broker => broker.SendAsync(queueName,
+                It.Is<QueueTMessage>(m =>
+                    new Guid(m.Id) != null && // Validate Id was set properly
+                    m.ContentType == QueueTTaskService.JsonContentType &&
+                    m.MessageType == QueueTTaskService.MessageType &&
+                    m.EncodedBody.SequenceEqual(serializedArguments))))
+                .Returns(Task.CompletedTask)
+                .Verifiable();
+
+            _taskService.AddTask(definition);
+            var message = _taskService.DelayAsync<TestTaskClass>(c => c.Multiply(5, 6)).Result;
+
+            _mockBroker.Verify();
+
+        }
+
+        [Fact]
+        public void DelayAsync_Correctly_Uses_Dispatcher()
         {
             var taskName = "MyTask";
             var queueName = "MyQueue";
@@ -119,7 +154,7 @@ namespace QueueT.Tests.Tasks
                     .Returns(Task.CompletedTask)
                     .Verifiable("Message is not being correctly dispatched");
 
-            var message = _taskService.DispatchAsync(_syncTestMethod, arguments).Result;
+            var message = _taskService.DelayAsync(_syncTestMethod, arguments).Result;
 
             _mockBroker.Verify();
 
@@ -184,44 +219,6 @@ namespace QueueT.Tests.Tasks
             _taskService.AddTask(new TaskDefinition(taskName, _asyncTestMethod, "queue"));
             var result = _taskService.ExecuteTaskMessageAsync(message).Result;
             Assert.Equal(result, expectedResult);
-        }
-
-        [Fact]
-        public void GetParametersForTask_Throws_When_Parameter_Not_Present()
-        {
-            var definition = new TaskDefinition("testTask", _syncTestMethod, "testQueue");
-            var arguments = new Dictionary<string, object> { };
-            Assert.Throws<ArgumentException>(() => _taskService.GetParametersForTask(definition, arguments));
-        }
-
-        [Fact]
-        public void GetParametersForTask_Creates_Correct_Array()
-        {
-            var definition = new TaskDefinition("testTask", _syncTestMethod, "testQueue");
-            var arguments = new Dictionary<string, object>
-            {
-                {"left", 1 },
-                {"right", 2 }
-            };
-
-            var parameters = _taskService.GetParametersForTask(definition, arguments);
-            Assert.Equal(new object[] { 1, 2 }, parameters);
-        }
-
-        [Fact]
-        public void GetParametersForTask_Ignores_Extra_Arguments()
-        {
-            var definition = new TaskDefinition("testTask", _syncTestMethod, "testQueue");
-
-            var arguments = new Dictionary<string, object>
-            {
-                {"left", 3 },
-                {"middle", "number" },
-                {"right", 4 }
-            };
-
-            var parameters = _taskService.GetParametersForTask(definition, arguments);
-            Assert.Equal(new object[] { 3, 4 }, parameters);
         }
     }
 }

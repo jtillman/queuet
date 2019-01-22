@@ -5,9 +5,12 @@
     ViewData["Title"] = "QueueT Task List";
 }
 
-<ul>
-    @foreach (var taskDefinition in taskOptions.Value.Tasks)
-    {
-        <li>@taskDefinition.Name</li>
-    }
-</ul>
+<div>
+    <h1>Registered Tasks</h1>
+    <ul>
+        @foreach (var taskDefinition in taskOptions.Value.Tasks)
+        {
+            <li>@taskDefinition.Name</li>
+        }
+    </ul>
+</div>

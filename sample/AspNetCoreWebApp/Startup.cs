@@ -31,7 +31,7 @@ namespace AspNetCoreWebApp
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
 
             services.AddQueueTTasks(new QueueT.Brokers.InMemoryBroker(), "default")
-                .RegisterTaskAttributes(Assembly.GetExecutingAssembly());
+                .RegisterQueuedTaskAttibutes(Assembly.GetExecutingAssembly());
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

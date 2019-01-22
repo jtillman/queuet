@@ -22,7 +22,6 @@ namespace QueueT.Tasks
                 return taskService;
             });
 
-            // Search for task and configure
             services.Configure<QueueTTaskOptions>(config =>
             {
                 config.DefaultQueueName = defaultQueueName;
@@ -31,7 +30,7 @@ namespace QueueT.Tasks
             return services;
         }
 
-        public static IServiceCollection RegisterTaskAttributes(this IServiceCollection services, Assembly assembly)
+        public static IServiceCollection RegisterQueuedTaskAttibutes(this IServiceCollection services, Assembly assembly)
         {
             services.Configure<QueueTTaskOptions>(config =>
             {
