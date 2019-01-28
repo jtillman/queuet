@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System;
@@ -10,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace QueueT.Tasks
 {
-    public class QueueTTaskService : IQueueTTaskService
+    public class QueueTTaskService : IQueueTTaskService, IQueueTMessageHandler
     {
         public const string JsonContentType = "application/json";
 
@@ -20,9 +21,8 @@ namespace QueueT.Tasks
 
         private readonly IServiceProvider _serviceProvider;
 
-        private readonly IQueueTBroker _broker;
-
-        private readonly QueueTTaskOptions _options;
+        private readonly QueueTServiceOptions _appOptions;
+        private readonly QueueTTaskOptions _taskOptions;
 
         private IDictionary<string, TaskDefinition> TaskDefinitionsByName { get; }
             = new Dictionary<string, TaskDefinition>();
@@ -33,16 +33,15 @@ namespace QueueT.Tasks
         public QueueTTaskService(
             ILogger<QueueTTaskService> logger,
             IServiceProvider serviceProvider,
-            IQueueTBroker broker,
+            IOptions<QueueTServiceOptions> appOptions,
             IOptions<QueueTTaskOptions> taskOptions)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
-            _broker = broker;
+            _appOptions = appOptions.Value;
+            _taskOptions = taskOptions.Value;
 
-            _options = taskOptions.Value;
-
-            foreach (var taskDefinition in _options.Tasks)
+            foreach (var taskDefinition in _taskOptions.Tasks)
                 AddTask(taskDefinition);
         }
 
@@ -111,7 +110,8 @@ namespace QueueT.Tasks
 
             byte[] serializedMessage = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message));
 
-            var queueTMessage = new QueueTMessage {
+            var queueTMessage = new QueueTMessage
+            {
                 Id = Guid.NewGuid().ToString(),
                 ContentType = JsonContentType,
                 Properties = new Dictionary<string, string>(),
@@ -120,9 +120,9 @@ namespace QueueT.Tasks
                 Created = DateTime.UtcNow
             };
 
-            var targetQueue = definition.QueueName ?? _options.DefaultQueueName;
+            var targetQueue = definition.QueueName ?? _taskOptions.DefaultQueueName ?? _appOptions.DefaultQueueName;
 
-            await _broker.SendAsync(targetQueue, queueTMessage);
+            await _appOptions.Broker.SendAsync(targetQueue, queueTMessage);
 
             return message;
         }
@@ -157,7 +157,7 @@ namespace QueueT.Tasks
             if (!TaskDefinitionsByName.TryGetValue(message.Name, out var taskDefinition))
                 throw new ArgumentException($"Task Naame [{message.Name}] is not registered."); // TODO: Make custom exception
 
-            var methodClass = _serviceProvider.GetService(taskDefinition.Method.DeclaringType);
+            var methodClass = ActivatorUtilities.GetServiceOrCreateInstance(_serviceProvider, taskDefinition.Method.DeclaringType);
 
             var retVal = taskDefinition.Method.Invoke(methodClass, taskDefinition.GetParametersFromArguments(message.Arguments));
             if (retVal is Task)
@@ -168,6 +168,28 @@ namespace QueueT.Tasks
                 retVal = resultProperty?.GetValue(retVal);
             }
             return retVal;
+        }
+
+        public bool CanHandleMessage(QueueTMessage message) => string.Equals(message?.MessageType, MessageType, StringComparison.InvariantCultureIgnoreCase);
+
+        public async Task HandleMessage(QueueTMessage message)
+        {
+            var jsonObject = JsonConvert.DeserializeObject(Encoding.UTF8.GetString(message.EncodedBody));
+            var taskMessage = JsonConvert.DeserializeObject<TaskMessage>(Encoding.UTF8.GetString(message.EncodedBody));
+
+            _logger.LogInformation($"Running task: {taskMessage.Name}");
+
+            try
+            {
+                await ExecuteTaskMessageAsync(taskMessage);
+            }catch (Exception ex)
+            {
+                _logger.LogCritical($"Task [{taskMessage.Name}] failed with exception: {ex.Message}");
+                // We can add some certaim properties to the message
+                // This will allow us to implement certain features like
+                // Task Retry
+                // Dead Lettering
+            }
         }
     }
 }

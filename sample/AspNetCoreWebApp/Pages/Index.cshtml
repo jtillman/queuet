@@ -1,4 +1,5 @@
 ﻿@page
+@inject  Microsoft.Extensions.Options.IOptions<QueueT.QueueTServiceOptions> queuetOptions
 @inject Microsoft.Extensions.Options.IOptions<QueueT.Tasks.QueueTTaskOptions> taskOptions
 @model IndexModel
 @{
@@ -13,4 +14,17 @@
             <li>@taskDefinition.Name</li>
         }
     </ul>
+
+    <h1>Queues</h1>
+    @foreach(var queueEntry in (queuetOptions.Value.Broker as QueueT.Brokers.InMemoryBroker).Queues)
+    {
+        <br /><br />
+        <h2>@queueEntry.Key - @queueEntry.Value.Count Items</h2>
+        <ul>
+            @foreach(var message in queueEntry.Value.ToList())
+            {
+                <li>@System.Text.Encoding.UTF8.GetString(message.EncodedBody)</li>
+            }
+        </ul>
+    }
 </div>

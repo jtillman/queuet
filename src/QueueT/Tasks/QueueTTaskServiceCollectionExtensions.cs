@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using System;
 using System.Linq;
 using System.Reflection;
 
@@ -9,44 +8,40 @@ namespace QueueT.Tasks
 
     public static class QueueTTaskServiceCollectionExtensions
     {
-        public static IServiceCollection AddQueueTTasks(this IServiceCollection services, IQueueTBroker queueBroker, string defaultQueueName = null)
+        public static QueueTServiceCollection UseTasks(this QueueTServiceCollection services, Action<QueueTTaskOptions> configure = null)
         {
-            services = services.AddSingleton<IQueueTTaskService>((s) =>
-            {
-                var taskService = new QueueTTaskService(
-                    s.GetRequiredService<ILogger<QueueTTaskService>>(),
-                    s,
-                    queueBroker,
-                    s.GetService<IOptions<QueueTTaskOptions>>());
+            services.Services.AddOptions<QueueTServiceOptions>();
+            services.AddQueueTMessageHandler<QueueTTaskService>();
+            services.Services.AddSingleton<IQueueTTaskService>(sp => sp.GetRequiredService<QueueTTaskService>());
 
-                return taskService;
-            });
-
-            services.Configure<QueueTTaskOptions>(config =>
+            if (null != configure)
             {
-                config.DefaultQueueName = defaultQueueName;
-            });
+                services.Services.Configure<QueueTTaskOptions>(config => configure(config));
+            }
 
             return services;
         }
 
-        public static IServiceCollection RegisterQueuedTaskAttibutes(this IServiceCollection services, Assembly assembly)
+        public static QueueTServiceCollection AddQueueTMessageHandler<T>(this QueueTServiceCollection services) where T : class, IQueueTMessageHandler
         {
-            services.Configure<QueueTTaskOptions>(config =>
-            {
-                assembly.GetTypes()
-                .SelectMany(t => t.GetMethods())
-                .Select(m => new { method = m, attribute = m.GetCustomAttribute<QueuedTaskAttribute>() })
-                .Where(entry => entry.attribute != null)
-                .ToList()
-                .ForEach(entry =>
-                {
-                    var taskName = entry.attribute.TaskName ?? entry.method.GetDefaultTaskNameForMethod();
-                    var queueName = entry.attribute.QueueName ?? config.DefaultQueueName;
-                    config.Tasks.Add(new TaskDefinition(taskName, entry.method, queueName));
-                });
-            });
+            services.Services.AddSingleton<T>();
+            services.Services.Configure<QueueTServiceOptions>(options => options.RegisterHandlerType<T>());
             return services;
+        }
+
+        public static void RegisterTaskAttibutes(this QueueTTaskOptions options, Assembly assembly)
+        {
+            assembly.GetTypes()
+            .SelectMany(t => t.GetMethods())
+            .Select(m => new { method = m, attribute = m.GetCustomAttribute<QueuedTaskAttribute>() })
+            .Where(entry => entry.attribute != null)
+            .ToList()
+            .ForEach(entry =>
+            {
+                var taskName = entry.attribute.TaskName ?? entry.method.GetDefaultTaskNameForMethod();
+                var queueName = entry.attribute.QueueName ?? options.DefaultQueueName;
+                options.Tasks.Add(new TaskDefinition(taskName, entry.method, queueName));
+            });
         } 
     }
 }

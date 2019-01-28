@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace QueueT.Tasks
 {
+
     public interface IQueueTTaskService
     {
         Task<TaskMessage> DelayAsync<T>(Expression<Action<T>> expression);

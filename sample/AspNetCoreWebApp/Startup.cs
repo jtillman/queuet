@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using QueueT;
 using QueueT.Tasks;
 using System.Reflection;
 
@@ -30,8 +31,17 @@ namespace AspNetCoreWebApp
 
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
 
-            services.AddQueueTTasks(new QueueT.Brokers.InMemoryBroker(), "default")
-                .RegisterQueuedTaskAttibutes(Assembly.GetExecutingAssembly());
+            services.AddQueueT(config=> {
+                config.Broker = new QueueT.Brokers.InMemoryBroker();
+                config.DefaultQueueName = "default";
+                config.AddQueues("default", "queue1", "queue2");
+            })
+            .UseTasks(config => {
+                config.DefaultQueueName = "default";
+                config.RegisterTaskAttibutes(Assembly.GetExecutingAssembly());
+            });
+
+            services.AddQueueTWorker();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -45,7 +55,6 @@ namespace AspNetCoreWebApp
             {
                 app.UseExceptionHandler("/Error");
             }
-
             app.UseStaticFiles();
             app.UseCookiePolicy();
 
