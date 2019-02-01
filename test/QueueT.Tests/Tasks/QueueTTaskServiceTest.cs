@@ -35,6 +35,7 @@ namespace QueueT.Tests.Tasks
         Mock<ILogger<QueueTTaskService>> _mockLogger;
         Mock<IServiceProvider> _mockServiceProvider;
         Mock<IQueueTBroker> _mockBroker;
+        Mock<IOptions<QueueTServiceOptions>> _mockServiceOptions;
         Mock<IOptions<QueueTTaskOptions>> _mockOptions;
 
         QueueTTaskService _taskService;
@@ -46,7 +47,11 @@ namespace QueueT.Tests.Tasks
             _mockLogger = new Mock<ILogger<QueueTTaskService>>();
             _mockServiceProvider = new Mock<IServiceProvider>();
             _mockBroker = new Mock<IQueueTBroker>();
+            _mockServiceOptions = new Mock<IOptions<QueueTServiceOptions>>();
             _mockOptions = new Mock<IOptions<QueueTTaskOptions>>();
+
+            _mockServiceOptions.SetupGet(x => x.Value)
+                .Returns(new QueueTServiceOptions { Broker = _mockBroker.Object });
 
             _mockOptions.SetupGet(x => x.Value)
                 .Returns(new QueueTTaskOptions());
@@ -54,7 +59,7 @@ namespace QueueT.Tests.Tasks
             _taskService = new QueueTTaskService(
                 _mockLogger.Object,
                 _mockServiceProvider.Object,
-                _mockBroker.Object,
+                _mockServiceOptions.Object,
                 _mockOptions.Object);
 
             _syncTestMethod = typeof(TestTaskClass).GetMethod(nameof(TestTaskClass.Multiply));
