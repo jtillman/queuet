@@ -11,6 +11,13 @@ namespace QueueT.Brokers
         public ConcurrentDictionary<string, Queue<QueueTMessage>> Queues =
             new ConcurrentDictionary<string, Queue<QueueTMessage>>();
 
+        public InMemoryBroker(params string[] queueNames)
+        {
+            foreach(var queueName in queueNames)
+            {
+                Queues[queueName] = new Queue<QueueTMessage>();
+            }
+        }
 
         public async Task SendAsync(string queueName, QueueTMessage message)
         {

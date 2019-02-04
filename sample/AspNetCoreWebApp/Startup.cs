@@ -31,13 +31,15 @@ namespace AspNetCoreWebApp
 
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
 
+            var queueNames = new string[] { "default", "queue1", "queue2" };
+
             services.AddQueueT(config=> {
-                config.Broker = new QueueT.Brokers.InMemoryBroker();
-                config.DefaultQueueName = "default";
-                config.AddQueues("default", "queue1", "queue2");
+                config.Broker = new QueueT.Brokers.InMemoryBroker(queueNames);
+                config.DefaultQueueName = queueNames[0];
+                // config.AddQueues(queueNames);
             })
             .UseTasks(config => {
-                config.DefaultQueueName = "default";
+                config.DefaultQueueName = queueNames[0];
                 config.RegisterTaskAttibutes(Assembly.GetExecutingAssembly());
             });
 

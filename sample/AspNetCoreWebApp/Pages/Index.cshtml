@@ -1,30 +1,115 @@
 ﻿@page
-@inject  Microsoft.Extensions.Options.IOptions<QueueT.QueueTServiceOptions> queuetOptions
-@inject Microsoft.Extensions.Options.IOptions<QueueT.Tasks.QueueTTaskOptions> taskOptions
 @model IndexModel
 @{
-    ViewData["Title"] = "QueueT Task List";
+    ViewData["Title"] = "QueueT Queues";
 }
 
-<div>
-    <h1>Registered Tasks</h1>
-    <ul>
-        @foreach (var taskDefinition in taskOptions.Value.Tasks)
-        {
-            <li>@taskDefinition.Name</li>
-        }
-    </ul>
+<div id="app" class="row">
+    <div class="col-4">
+        <h2>Queues
+            <div v-if="queuesLoading" class="spinner-border" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+        </h2>
+        <div v-if="!queuesLoading" class="list-group">
+            <div v-for="queue in queues"
+                class="list-group-item">
+                <div class="d-flex w-100 justify-content-between">
+                    <h5 class="mb-1">{{ queue.name }}</h5>
+                    <small>{{ queue.length }} Items</small>
+                </div>
+                <div class="d-flex w-100 justify-content-between">
+                    <div class="custom-control custom-switch">
+                        <input :id="'listen_' + queue.name"
+                               type="checkbox"
+                               class="custom-control-input"
+                               v-model="queue.monitored"
+                               v-on:click="setQueueMonitoring(queue, !queue.monitored)">
+                        <label class="custom-control-label" :for="'listen_' + queue.name">
+                            <span v-if="queue.monitored">Listening</span>
+                            <span v-else>Not Listening</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <h1>Queues</h1>
-    @foreach(var queueEntry in (queuetOptions.Value.Broker as QueueT.Brokers.InMemoryBroker).Queues)
-    {
-        <br /><br />
-        <h2>@queueEntry.Key - @queueEntry.Value.Count Items</h2>
-        <ul>
-            @foreach(var message in queueEntry.Value.ToList())
-            {
-                <li>@System.Text.Encoding.UTF8.GetString(message.EncodedBody)</li>
-            }
-        </ul>
-    }
+    <div class="col-8">
+        <h2>Tasks
+            <div v-if="tasksLoading" class="spinner-border" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+        </h2>
+        <form v-if="!tasksLoading">
+            <div class="form-group">
+                <select class="form-control" id="taskSelector" v-model="selectedTask">
+                    <option disabled :value="null">Select A Task</option>
+                    <option v-for="task in tasks" :value="task">{{ task.name }}</option>
+                </select>
+            </div>
+        </form>
+    </div>
 </div>
+
+@section Scripts
+{
+    <script type="text/javascript">
+        var app = new Vue({
+            el: '#app',
+            data: {
+                queues: [],
+                queuesLoading: false,
+                selectedTask: null,
+                tasks: [],
+                tasksLoading: false
+            },
+            created() {
+                this.loadQueues();
+                this.loadTasks();
+            },
+            methods: {
+
+                setQueueMonitoring: function (queue, monitor) {
+                    console.log("Setting");
+                    var vm = this;
+                    vm.$http
+                        .put("api/queues/" + queue.name,
+                            { monitored: monitor }
+                        )
+                        .then(function (response) {
+                            queue.monitor = response.data.monitor
+                        })
+                },
+
+                loadQueues: function () {
+                    var vm = this;
+                    if (vm.queuesLoading)
+                        return;
+
+                    vm.queuesLoading = true;
+                    vm.$http
+                        .get("api/queues/")
+                        .then(function (response) {
+                            vm.queues = response.data.items;
+                            vm.queuesLoading = false;
+                        });
+                },
+
+                loadTasks: function () {
+                    var vm = this;
+                    if (vm.tasksLoading)
+                        return;
+
+                    vm.tasksLoading = true;
+                    vm.$http
+                        .get("api/tasks/")
+                        .then(function (response) {
+                            vm.tasks = response.data.items;
+                            vm.tasksLoading = false;
+                        });
+                }
+            }
+        })
+    </script>
+}
