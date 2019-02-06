@@ -46,6 +46,7 @@ namespace QueueT.Brokers
             while (!cancellationToken.IsCancellationRequested && queue.Count > 0 && messagesRead < maxMessages)
             {
                 var message = queue.Dequeue();
+                messagesRead++;
 
                 try
                 {
