@@ -28,8 +28,6 @@ namespace QueueT.Worker
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            int queueIndex = 0;
-
             foreach(var handlerType in _options.MessageHandlerTypes)
             {
                 _logger.LogInformation($"Retrieve instance of handler: {handlerType.Name}");
@@ -38,12 +36,20 @@ namespace QueueT.Worker
 
             _logger.LogInformation("Starting to receive from queues");
 
+
+            var queueIndex = 0;
             while (!stoppingToken.IsCancellationRequested)
             {
-                var queue = _options.Queues[queueIndex];
-                //_logger.LogDebug($"Attempting to receive {_options.WorkerBatchSize} message on queue: {queue}");
-                await _options.Broker.ReceiveMessagesAsync(queue, _options.WorkerBatchSize, ProcessMessageAsync, stoppingToken);
 
+                if (_options.Queues.Count > queueIndex) {
+                    var queue = _options.Queues[queueIndex];
+                    await _options.Broker.ReceiveMessagesAsync(queue, _options.WorkerBatchSize, ProcessMessageAsync, stoppingToken);
+                }
+                else
+                {
+                    // Assuming QueueList has changed
+                    await Task.Delay(500);
+                }
                 queueIndex = _options.Queues.Count <= queueIndex + 1 ? 0 : queueIndex + 1;
             }
         }
