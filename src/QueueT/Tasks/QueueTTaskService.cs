@@ -2,8 +2,11 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
@@ -16,6 +19,8 @@ namespace QueueT.Tasks
         public const string JsonContentType = "application/json";
 
         public const string MessageType = "task";
+
+        public const string TaskNamePropertyKey = "taskName";
 
         private readonly ILogger<QueueTTaskService> _logger;
 
@@ -108,15 +113,15 @@ namespace QueueT.Tasks
                 Arguments = arguments
             };
 
-            byte[] serializedMessage = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message));
+            byte[] serializedArguments = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(arguments));
 
             var queueTMessage = new QueueTMessage
             {
                 Id = Guid.NewGuid().ToString(),
                 ContentType = JsonContentType,
-                Properties = new Dictionary<string, string>(),
+                Properties = new Dictionary<string, string> { { TaskNamePropertyKey, definition.Name } },
                 MessageType = MessageType,
-                EncodedBody = serializedMessage,
+                EncodedBody = serializedArguments,
                 Created = DateTime.UtcNow
             };
 
@@ -174,17 +179,39 @@ namespace QueueT.Tasks
 
         public async Task HandleMessage(QueueTMessage message)
         {
-            var jsonObject = JsonConvert.DeserializeObject(Encoding.UTF8.GetString(message.EncodedBody));
-            var taskMessage = JsonConvert.DeserializeObject<TaskMessage>(Encoding.UTF8.GetString(message.EncodedBody));
+            if (!message.Properties.TryGetValue(TaskNamePropertyKey, out var taskName))
+                throw new ArgumentException("TaskName not present in message");
 
-            _logger.LogInformation($"Running task: {taskMessage.Name}");
+            if (!TaskDefinitionsByName.TryGetValue(taskName, out var definition))
+                throw new ArgumentException($"Received task with unknown name {taskName}");
+
+            var sw = new Stopwatch();
+            sw.Start();
+
+            var arguments = new Dictionary<string, object>();
+            var jsonArguments = JsonConvert.DeserializeObject(Encoding.UTF8.GetString(message.EncodedBody)) as JObject;
+            foreach(var property in jsonArguments.Properties())
+            {
+                var parameter = definition.Parameters.FirstOrDefault(p => p.Name.Equals(property.Name));
+                if (null == parameter)
+                    continue;
+
+                arguments[parameter.Name] = property.Value.ToObject(parameter.ParameterType);
+            }
+
+            var taskMessage = new TaskMessage { Name = taskName, Arguments = arguments };
+
+            _logger.LogDebug("TaskMessage Deserialized: TaskName={TaskName} TotalMilliseconds={TotalMilliseconds} MessageSize={MessageSize}", taskMessage.Name, sw.Elapsed.TotalMilliseconds, message.EncodedBody.Length);
 
             try
             {
+                _logger.LogInformation("Task Starting: TaskName={TaskName}", taskMessage.Name);
+                sw.Restart();
                 await ExecuteTaskMessageAsync(taskMessage);
+                _logger.LogInformation("Task Completed: TaskName={TaskName} TotalMilliseconds={TotalMilliseconds}", taskMessage.Name, sw.Elapsed.TotalMilliseconds);
             }catch (Exception ex)
             {
-                _logger.LogCritical($"Task [{taskMessage.Name}] failed with exception: {ex.Message}");
+                _logger.LogCritical("Task Failed: TaskName={TaskName} TotalMilliseconds={TotalMilliseconds} Exception={ex.Message}", taskMessage.Name, sw.Elapsed.TotalMilliseconds, ex.Message);
                 // We can add some certaim properties to the message
                 // This will allow us to implement certain features like
                 // Task Retry

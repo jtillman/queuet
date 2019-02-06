@@ -103,11 +103,8 @@ namespace QueueT.Tests.Tasks
 
             var serializedArguments = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(
                 new {
-                    name = taskName,
-                    arguments = new {
-                        left,
-                        right
-                    }
+                    left,
+                    right
                 }));
 
             var definition = new TaskDefinition(taskName, _syncTestMethod, queueName);
@@ -117,6 +114,7 @@ namespace QueueT.Tests.Tasks
                     new Guid(m.Id) != null && // Validate Id was set properly
                     m.ContentType == QueueTTaskService.JsonContentType &&
                     m.MessageType == QueueTTaskService.MessageType &&
+                    m.Properties[QueueTTaskService.TaskNamePropertyKey] == taskName &&
                     m.EncodedBody.SequenceEqual(serializedArguments))))
                 .Returns(Task.CompletedTask)
                 .Verifiable();
@@ -140,12 +138,8 @@ namespace QueueT.Tests.Tasks
             var serializedArguments = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(
                 new
                 {
-                    name = "MyTask",
-                    arguments = new
-                    {
-                        left = 5,
-                        right = 8
-                    }
+                    left = 5,
+                    right = 8
                 }));
 
             _mockBroker.Setup(
@@ -155,6 +149,7 @@ namespace QueueT.Tests.Tasks
                     It.Is<QueueTMessage>(m =>
                         m.ContentType == QueueTTaskService.JsonContentType &&
                         m.MessageType == QueueTTaskService.MessageType && 
+                        m.Properties[QueueTTaskService.TaskNamePropertyKey] == taskName &&
                         m.EncodedBody.SequenceEqual(serializedArguments))))
                     .Returns(Task.CompletedTask)
                     .Verifiable("Message is not being correctly dispatched");
