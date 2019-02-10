@@ -14,6 +14,11 @@ using System.Threading.Tasks;
 
 namespace QueueT.Tasks
 {
+    public class DispatchOptions
+    {
+        public string Queue { get; set; }
+    }
+
     public class QueueTTaskService : IQueueTTaskService, IQueueTMessageHandler
     {
         public const string JsonContentType = "application/json";
@@ -64,11 +69,11 @@ namespace QueueT.Tasks
             TaskDefinitionsByMethod.Add(taskDefinition.Method, taskDefinition);
         }
 
-        public async Task<TaskMessage> DelayAsync<T>(Expression<Action<T>> expression) => await _DelayAsync(expression?.Body as MethodCallExpression);
+        public async Task<TaskMessage> DelayAsync<T>(Expression<Action<T>> expression, DispatchOptions options = null) => await _DelayAsync(expression?.Body as MethodCallExpression, options);
 
-        public async Task<TaskMessage> DelayAsync<T>(Expression<Func<T, Task>> expression) => await _DelayAsync(expression?.Body as MethodCallExpression);
+        public async Task<TaskMessage> DelayAsync<T>(Expression<Func<T, Task>> expression, DispatchOptions options = null) => await _DelayAsync(expression?.Body as MethodCallExpression, options);
 
-        private async Task<TaskMessage> _DelayAsync(MethodCallExpression methodExpression)
+        private async Task<TaskMessage> _DelayAsync(MethodCallExpression methodExpression, DispatchOptions options = null)
         {
             if (null == methodExpression)
                 throw new ArgumentException("Expression must be a method call");
@@ -80,7 +85,7 @@ namespace QueueT.Tasks
 
             var definition = GetForMethod(methodExpression.Method);
             var arguments = definition.CreateArgumentsFromCall(methodExpression);
-            return await DispatchAsync(definition, arguments);
+            return await DispatchAsync(definition, arguments, options);
         }
 
         internal TaskDefinition GetForMethod(MethodInfo methodInfo)
@@ -94,7 +99,7 @@ namespace QueueT.Tasks
             return definition;
         }
 
-        public async Task<TaskMessage> DelayAsync(MethodInfo methodInfo, IDictionary<string, object> arguments)
+        public async Task<TaskMessage> DelayAsync(MethodInfo methodInfo, IDictionary<string, object> arguments, DispatchOptions options = null)
         {
             if (methodInfo == null)
                 throw new ArgumentNullException(nameof(methodInfo));
@@ -102,10 +107,30 @@ namespace QueueT.Tasks
             if (!TaskDefinitionsByMethod.TryGetValue(methodInfo, out TaskDefinition definition))
                 throw new ArgumentException($"Method [{methodInfo.Name}] must be registered before dispatching."); // TODO: Make custom exception
 
-            return await DispatchAsync(definition, arguments);
+            return await DispatchAsync(definition, arguments, options);
         }
 
-        internal async Task<TaskMessage> DispatchAsync(TaskDefinition definition, IDictionary<string, object> arguments)
+        public async Task<string> DispatchAsync(TaskDefinition definition, byte[] encodedArguments, DispatchOptions options = null)
+        {
+            var messageId = Guid.NewGuid().ToString();
+
+            var queueTMessage = new QueueTMessage
+            {
+                Id = messageId,
+                ContentType = JsonContentType,
+                Properties = new Dictionary<string, string> { { TaskNamePropertyKey, definition.Name } },
+                MessageType = MessageType,
+                EncodedBody = encodedArguments,
+                Created = DateTime.UtcNow
+            };
+
+            var targetQueue = options?.Queue ?? definition.QueueName ?? _taskOptions.DefaultQueueName ?? _appOptions.DefaultQueueName;
+
+            await _appOptions.Broker.SendAsync(targetQueue, queueTMessage);
+            return messageId;
+        }
+
+        public async Task<TaskMessage> DispatchAsync(TaskDefinition definition, IDictionary<string, object> arguments, DispatchOptions options = null)
         {
             var message = new TaskMessage
             {
@@ -115,19 +140,7 @@ namespace QueueT.Tasks
 
             byte[] serializedArguments = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(arguments));
 
-            var queueTMessage = new QueueTMessage
-            {
-                Id = Guid.NewGuid().ToString(),
-                ContentType = JsonContentType,
-                Properties = new Dictionary<string, string> { { TaskNamePropertyKey, definition.Name } },
-                MessageType = MessageType,
-                EncodedBody = serializedArguments,
-                Created = DateTime.UtcNow
-            };
-
-            var targetQueue = definition.QueueName ?? _taskOptions.DefaultQueueName ?? _appOptions.DefaultQueueName;
-
-            await _appOptions.Broker.SendAsync(targetQueue, queueTMessage);
+            await DispatchAsync(definition, serializedArguments, options);
 
             return message;
         }
@@ -189,14 +202,22 @@ namespace QueueT.Tasks
             sw.Start();
 
             var arguments = new Dictionary<string, object>();
-            var jsonArguments = JsonConvert.DeserializeObject(Encoding.UTF8.GetString(message.EncodedBody)) as JObject;
-            foreach(var property in jsonArguments.Properties())
-            {
-                var parameter = definition.Parameters.FirstOrDefault(p => p.Name.Equals(property.Name));
-                if (null == parameter)
-                    continue;
 
-                arguments[parameter.Name] = property.Value.ToObject(parameter.ParameterType);
+            try
+            {
+                var jsonArguments = JsonConvert.DeserializeObject(Encoding.UTF8.GetString(message.EncodedBody)) as JObject;
+                foreach (var property in jsonArguments.Properties())
+                {
+                    var parameter = definition.Parameters.FirstOrDefault(p => p.Name.Equals(property.Name));
+                    if (null == parameter)
+                        continue;
+
+                    arguments[parameter.Name] = property.Value.ToObject(parameter.ParameterType);
+                }
+            }catch(Exception ex)
+            {
+                _logger.LogCritical("Unable to deserialize task: TaskName={TaskName} Exception={exception}", taskName, ex.Message);
+                return;
             }
 
             var taskMessage = new TaskMessage { Name = taskName, Arguments = arguments };
