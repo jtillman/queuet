@@ -6,14 +6,12 @@
 
 <div id="app" class="row">
     <div class="col-4">
-        <h2>Queues
-            <div v-if="queuesLoading" class="spinner-border" role="status">
-                <span class="sr-only">Loading...</span>
-            </div>
-        </h2>
-        <div v-if="!queuesLoading" class="list-group">
+        <div>
+            <h2>Queues</h2>
+        </div>
+        <div class="list-group">
             <div v-for="queue in queues"
-                class="list-group-item">
+                 class="list-group-item">
                 <div class="d-flex w-100 justify-content-between">
                     <h5 class="mb-1">{{ queue.name }}</h5>
                     <small>{{ queue.length }} Items</small>
@@ -33,10 +31,21 @@
                 </div>
             </div>
         </div>
+        <br/>
+        <div class="d-flex w-100 justify-content-between">
+            <div class="custom-control custom-switch">
+                <input id="queueAutoUpdate"
+                       type="checkbox"
+                       class="custom-control-input"
+                       v-on:click="setAutoUpdateQueues(null == queueTimer)">
+                <label class="custom-control-label" for="queueAutoUpdate">Auto Update</label>
+            </div>
+        </div>
     </div>
 
     <div class="col-8">
-        <h2>Tasks
+        <h2>
+            Tasks
             <div v-if="tasksLoading" class="spinner-border" role="status">
                 <span class="sr-only">Loading...</span>
             </div>
@@ -48,7 +57,25 @@
                     <option v-for="task in tasks" :value="task">{{ task.name }}</option>
                 </select>
             </div>
+
+            <div v-if="selectedTask" class="form-group">
+                <label for="taskArguments">Arguments</label>
+                <textarea ref="argumentTextArea" class="form-control" v-on:input="argumentsChanged($event)"></textarea>
+            </div>
         </form>
+
+        <div class="dropdown">
+            <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton"
+                    data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
+                    :disabled="!selectedTask">
+                Dispatch To
+            </button>
+            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                <a v-for="queue in queues"
+                   class="dropdown-item"
+                   v-on:click="dispatchTask(selectedTask, queue.name)">{{ queue.name }}</a>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -58,8 +85,10 @@
         var app = new Vue({
             el: '#app',
             data: {
+                arguments: "",
                 queues: [],
                 queuesLoading: false,
+                queueTimer: null,
                 selectedTask: null,
                 tasks: [],
                 tasksLoading: false
@@ -69,9 +98,23 @@
                 this.loadTasks();
             },
             methods: {
-
+                argumentsChanged: function (evnt) {
+                    var control = this.$refs.argumentTextArea;
+                    $(control)
+                        .css('height', 'auto')
+                        .css('height', control.scrollHeight + (control.offsetHeight - control.clientHeight));
+                    this.arguments = evnt.target.value;
+                },
+                setAutoUpdateQueues: function (autoUpdate) {
+                    if (!autoUpdate && this.queueTimer != null) {
+                        window.clearInterval(this.queueTimer);
+                        this.queueTimer = null;
+                    }
+                    else if (autoUpdate && null == this.queueTimer) {
+                        this.queueTimer = window.setInterval(this.loadQueues, 1000);
+                    }
+                },
                 setQueueMonitoring: function (queue, monitor) {
-                    console.log("Setting");
                     var vm = this;
                     vm.$http
                         .put("api/queues/" + queue.name,
@@ -107,6 +150,15 @@
                         .then(function (response) {
                             vm.tasks = response.data.items;
                             vm.tasksLoading = false;
+                        });
+                },
+                dispatchTask: function (task, queueName) {
+                    var vm = this;
+
+                    vm.$http
+                        .post("api/tasks/" + task.name + "/delay", {
+                            queue: queueName,
+                            arguments: this.arguments
                         });
                 }
             }

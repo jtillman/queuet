@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using QueueT.Tasks;
+using System;
+using System.Threading.Tasks;
 
 namespace AspNetCoreWebApp.Tasks
 {
@@ -20,5 +22,12 @@ namespace AspNetCoreWebApp.Tasks
 
         [QueuedTask(TaskName = "SubstractTask")]
         public int Substract(int right, int left) => right - left;
+
+        [QueuedTask(TaskName = "DelayWrite")]
+        public async Task DelayWrite(string message, int seconds = 0)
+        {
+            await Task.Delay(seconds * 1000);
+            Console.WriteLine($"After {seconds} seconds: {message}");
+        }
     }
 }

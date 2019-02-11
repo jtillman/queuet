@@ -1,12 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json.Linq;
 using QueueT.Tasks;
+using System.Linq;
+using System.Text;
 
 namespace AspNetCoreWebApp.Api
 {
@@ -41,16 +37,24 @@ namespace AspNetCoreWebApp.Api
             });
         }
 
-        [HttpPost("{taskName}/invoke")]
-        public IActionResult InvokeTask(string taskName, JObject arguments)
+        public class DelayTaskRequest
+        {
+            public string Queue { get; set; }
+            public string Arguments { get; set; }
+        }
+
+        [HttpPost("{taskName}/delay")]
+        public IActionResult DelayTask(string taskName, [FromBody]DelayTaskRequest request)
         {
             var definition = _taskOptions.Tasks.FirstOrDefault(x => x.Name == taskName);
             if (null == definition)
                 return NotFound();
 
-            _taskService.DelayAsync(definition.Method, new Dictionary<string, object>() { });
+            _taskService.DispatchAsync(definition,
+                Encoding.UTF8.GetBytes(request.Arguments),
+                new DispatchOptions { Queue = request.Queue });
 
-            return new ViewResult { StatusCode = 201 };
+            return new JsonResult(new { }) { StatusCode = 201 };
         }
     }
 }
