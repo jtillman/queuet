@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -36,21 +37,40 @@ namespace QueueT.Worker
 
             _logger.LogInformation("Starting to receive from queues");
 
-
             var queueIndex = 0;
+            var taskList = new List<Task>();
+            var activeQueues = new string[] { };
+
             while (!stoppingToken.IsCancellationRequested)
             {
-
-                if (_options.Queues.Count > queueIndex) {
-                    var queue = _options.Queues[queueIndex];
-                    await _options.Broker.ReceiveMessagesAsync(queue, _options.WorkerBatchSize, ProcessMessageAsync, stoppingToken);
-                }
-                else
+                // Detect Queue List Changes
+                var currentQueues = _options.Queues.ToArray();
+                if (!currentQueues.SequenceEqual(activeQueues))
                 {
-                    // Assuming QueueList has changed
-                    await Task.Delay(500);
+                    activeQueues = currentQueues;
+                    queueIndex = 0;
                 }
-                queueIndex = _options.Queues.Count <= queueIndex + 1 ? 0 : queueIndex + 1;
+
+                // Wait idle time when no queues listed
+                if( 0 == activeQueues.Length)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5)); // FIXME: Magic Number for wait time
+                    continue;
+                }
+
+                taskList = taskList.Where(t => !t.IsCompleted).ToList();
+
+                while(taskList.Count < _options.WorkerTaskCount)
+                {
+                    var queue = currentQueues[queueIndex];
+                    taskList.Add(Task.Run(async () =>
+                    {
+                        await _options.Broker.ReceiveMessagesAsync(queue, _options.WorkerBatchSize, ProcessMessageAsync, stoppingToken);
+                    }));
+
+                    queueIndex = activeQueues.Length <= queueIndex + 1 ? 0 : queueIndex + 1;
+                }
+                await Task.WhenAny(taskList);
             }
         }
 

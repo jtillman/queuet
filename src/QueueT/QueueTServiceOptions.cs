@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace QueueT
 {
@@ -10,11 +9,13 @@ namespace QueueT
 
         public IList<string> Queues { get; set; } = new List<string>();
 
+        public int WorkerTaskCount { get; set; } = Environment.ProcessorCount * 2;
+
         public int WorkerBatchSize { get; set; } = 10;
 
         public IQueueTBroker Broker { get; set; }
 
-        public IList<Type> MessageHandlerTypes { get; set; } = new List<Type>();
+        public IList<Type> MessageHandlerTypes { get; } = new List<Type>();
 
         public void RegisterHandlerType<T>() where T: IQueueTMessageHandler
         {
