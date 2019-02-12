@@ -17,7 +17,7 @@ namespace QueueT
 
         public IList<Type> MessageHandlerTypes { get; } = new List<Type>();
 
-        public void RegisterHandlerType<T>() where T: IQueueTMessageHandler
+        public void RegisterHandlerType<T>() where T: IMessageHandler
         {
             MessageHandlerTypes.Add(typeof(T));
         }

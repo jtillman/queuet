@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace QueueT.Tasks
 {
 
-    public interface IQueueTTaskService
+    public interface ITaskService
     {
         Task<TaskMessage> DelayAsync<T>(Expression<Action<T>> expression, DispatchOptions options = null);
 

@@ -2,7 +2,7 @@
 
 namespace QueueT
 {
-    public interface IQueueTMessageHandler
+    public interface IMessageHandler
     {
         bool CanHandleMessage(QueueTMessage message);
         Task HandleMessage(QueueTMessage message);

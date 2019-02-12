@@ -13,50 +13,34 @@ using Microsoft.Extensions.Options;
 
 namespace QueueT.Tests.Tasks
 {
-    public class TestTaskClass
+
+    public class TaskServiceTest
     {
-
-        public TestTaskClass() { }
-
-        public int Multiply(int left, int right)
-        {
-            return left * right;
-        }
-
-        public async Task<int> MultiplyAsync(int left, int right)
-        {
-            await Task.Delay(50); // Add a 50 millisecond delay
-            return left * right;
-        }
-    }
-
-    public class QueueTTaskServiceTest
-    {
-        Mock<ILogger<QueueTTaskService>> _mockLogger;
+        Mock<ILogger<TaskService>> _mockLogger;
         Mock<IServiceProvider> _mockServiceProvider;
         Mock<IQueueTBroker> _mockBroker;
         Mock<IOptions<QueueTServiceOptions>> _mockServiceOptions;
-        Mock<IOptions<QueueTTaskOptions>> _mockOptions;
+        Mock<IOptions<TaskOptions>> _mockOptions;
 
-        QueueTTaskService _taskService;
+        TaskService _taskService;
         MethodInfo _syncTestMethod;
         MethodInfo _asyncTestMethod;
 
-        public QueueTTaskServiceTest()
+        public TaskServiceTest()
         {
-            _mockLogger = new Mock<ILogger<QueueTTaskService>>();
+            _mockLogger = new Mock<ILogger<TaskService>>();
             _mockServiceProvider = new Mock<IServiceProvider>();
             _mockBroker = new Mock<IQueueTBroker>();
             _mockServiceOptions = new Mock<IOptions<QueueTServiceOptions>>();
-            _mockOptions = new Mock<IOptions<QueueTTaskOptions>>();
+            _mockOptions = new Mock<IOptions<TaskOptions>>();
 
             _mockServiceOptions.SetupGet(x => x.Value)
                 .Returns(new QueueTServiceOptions { Broker = _mockBroker.Object });
 
             _mockOptions.SetupGet(x => x.Value)
-                .Returns(new QueueTTaskOptions());
+                .Returns(new TaskOptions());
 
-            _taskService = new QueueTTaskService(
+            _taskService = new TaskService(
                 _mockLogger.Object,
                 _mockServiceProvider.Object,
                 _mockServiceOptions.Object,
@@ -112,9 +96,9 @@ namespace QueueT.Tests.Tasks
             _mockBroker.Setup(broker => broker.SendAsync(queueName,
                 It.Is<QueueTMessage>(m =>
                     new Guid(m.Id) != null && // Validate Id was set properly
-                    m.ContentType == QueueTTaskService.JsonContentType &&
-                    m.MessageType == QueueTTaskService.MessageType &&
-                    m.Properties[QueueTTaskService.TaskNamePropertyKey] == taskName &&
+                    m.ContentType == TaskService.JsonContentType &&
+                    m.MessageType == TaskService.MessageType &&
+                    m.Properties[TaskService.TaskNamePropertyKey] == taskName &&
                     m.EncodedBody.SequenceEqual(serializedArguments))))
                 .Returns(Task.CompletedTask)
                 .Verifiable();
@@ -147,9 +131,9 @@ namespace QueueT.Tests.Tasks
                     queueName,
                     
                     It.Is<QueueTMessage>(m =>
-                        m.ContentType == QueueTTaskService.JsonContentType &&
-                        m.MessageType == QueueTTaskService.MessageType && 
-                        m.Properties[QueueTTaskService.TaskNamePropertyKey] == taskName &&
+                        m.ContentType == TaskService.JsonContentType &&
+                        m.MessageType == TaskService.MessageType && 
+                        m.Properties[TaskService.TaskNamePropertyKey] == taskName &&
                         m.EncodedBody.SequenceEqual(serializedArguments))))
                     .Returns(Task.CompletedTask)
                     .Verifiable("Message is not being correctly dispatched");

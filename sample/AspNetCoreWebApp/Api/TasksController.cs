@@ -10,10 +10,10 @@ namespace AspNetCoreWebApp.Api
     [ApiController]
     public class TasksController : ControllerBase
     {
-        private QueueTTaskOptions _taskOptions;
-        private IQueueTTaskService _taskService;
+        private TaskOptions _taskOptions;
+        private ITaskService _taskService;
 
-        public TasksController(IOptions<QueueTTaskOptions> taskOptions, IQueueTTaskService taskService)
+        public TasksController(IOptions<TaskOptions> taskOptions, ITaskService taskService)
         {
             _taskOptions = taskOptions.Value;
             _taskService = taskService;

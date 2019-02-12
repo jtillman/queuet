@@ -2,13 +2,13 @@
 
 namespace QueueT.Tasks
 {
-    public class QueueTTaskOptions
+    public class TaskOptions
     {
         public string DefaultQueueName { get; set; }
 
         public List<TaskDefinition> Tasks { get; set; }
 
-        public QueueTTaskOptions()
+        public TaskOptions()
         {
             Tasks = new List<TaskDefinition>();
         }

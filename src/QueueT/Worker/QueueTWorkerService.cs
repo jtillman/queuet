@@ -14,7 +14,7 @@ namespace QueueT.Worker
     {
         ILogger<QueueTWorkerService> _logger;
         QueueTServiceOptions _options;
-        IList<IQueueTMessageHandler> _messageHandlers = new List<IQueueTMessageHandler>();
+        IList<IMessageHandler> _messageHandlers = new List<IMessageHandler>();
         IServiceProvider _serviceProvider;
 
         public QueueTWorkerService(
@@ -32,7 +32,7 @@ namespace QueueT.Worker
             foreach(var handlerType in _options.MessageHandlerTypes)
             {
                 _logger.LogInformation($"Retrieve instance of handler: {handlerType.Name}");
-                _messageHandlers.Add(_serviceProvider.GetRequiredService(handlerType) as IQueueTMessageHandler);
+                _messageHandlers.Add(_serviceProvider.GetRequiredService(handlerType) as IMessageHandler);
             }
 
             _logger.LogInformation("Starting to receive from queues");
@@ -51,14 +51,15 @@ namespace QueueT.Worker
                     queueIndex = 0;
                 }
 
+                // Trim completed tasks
+                taskList = taskList.Where(t => !t.IsCompleted).ToList();
+
                 // Wait idle time when no queues listed
-                if( 0 == activeQueues.Length)
+                if ( 0 == activeQueues.Length)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(5)); // FIXME: Magic Number for wait time
                     continue;
                 }
-
-                taskList = taskList.Where(t => !t.IsCompleted).ToList();
 
                 while(taskList.Count < _options.WorkerTaskCount)
                 {

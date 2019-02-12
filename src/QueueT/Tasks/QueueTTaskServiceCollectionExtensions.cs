@@ -8,28 +8,28 @@ namespace QueueT.Tasks
 
     public static class QueueTTaskServiceCollectionExtensions
     {
-        public static QueueTServiceCollection UseTasks(this QueueTServiceCollection services, Action<QueueTTaskOptions> configure = null)
+        public static QueueTServiceCollection UseTasks(this QueueTServiceCollection services, Action<TaskOptions> configure = null)
         {
             services.Services.AddOptions<QueueTServiceOptions>();
-            services.AddQueueTMessageHandler<QueueTTaskService>();
-            services.Services.AddSingleton<IQueueTTaskService>(sp => sp.GetRequiredService<QueueTTaskService>());
+            services.AddQueueTMessageHandler<TaskService>();
+            services.Services.AddSingleton<ITaskService>(sp => sp.GetRequiredService<TaskService>());
 
             if (null != configure)
             {
-                services.Services.Configure<QueueTTaskOptions>(config => configure(config));
+                services.Services.Configure<TaskOptions>(config => configure(config));
             }
 
             return services;
         }
 
-        public static QueueTServiceCollection AddQueueTMessageHandler<T>(this QueueTServiceCollection services) where T : class, IQueueTMessageHandler
+        public static QueueTServiceCollection AddQueueTMessageHandler<T>(this QueueTServiceCollection services) where T : class, IMessageHandler
         {
             services.Services.AddSingleton<T>();
             services.Services.Configure<QueueTServiceOptions>(options => options.RegisterHandlerType<T>());
             return services;
         }
 
-        public static void RegisterTaskAttibutes(this QueueTTaskOptions options, Assembly assembly)
+        public static void RegisterTaskAttibutes(this TaskOptions options, Assembly assembly)
         {
             assembly.GetTypes()
             .SelectMany(t => t.GetMethods())

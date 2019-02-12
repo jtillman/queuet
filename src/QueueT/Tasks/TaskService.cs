@@ -14,12 +14,7 @@ using System.Threading.Tasks;
 
 namespace QueueT.Tasks
 {
-    public class DispatchOptions
-    {
-        public string Queue { get; set; }
-    }
-
-    public class QueueTTaskService : IQueueTTaskService, IQueueTMessageHandler
+    public class TaskService : ITaskService, IMessageHandler
     {
         public const string JsonContentType = "application/json";
 
@@ -27,12 +22,12 @@ namespace QueueT.Tasks
 
         public const string TaskNamePropertyKey = "taskName";
 
-        private readonly ILogger<QueueTTaskService> _logger;
+        private readonly ILogger<TaskService> _logger;
 
         private readonly IServiceProvider _serviceProvider;
 
         private readonly QueueTServiceOptions _appOptions;
-        private readonly QueueTTaskOptions _taskOptions;
+        private readonly TaskOptions _taskOptions;
 
         private IDictionary<string, TaskDefinition> TaskDefinitionsByName { get; }
             = new Dictionary<string, TaskDefinition>();
@@ -40,11 +35,11 @@ namespace QueueT.Tasks
         private IDictionary<MethodInfo, TaskDefinition> TaskDefinitionsByMethod { get; }
             = new Dictionary<MethodInfo, TaskDefinition>();
 
-        public QueueTTaskService(
-            ILogger<QueueTTaskService> logger,
+        public TaskService(
+            ILogger<TaskService> logger,
             IServiceProvider serviceProvider,
             IOptions<QueueTServiceOptions> appOptions,
-            IOptions<QueueTTaskOptions> taskOptions)
+            IOptions<TaskOptions> taskOptions)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
