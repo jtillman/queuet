@@ -20,7 +20,7 @@ namespace QueueT.Tests.Tasks
         Mock<IServiceProvider> _mockServiceProvider;
         Mock<IQueueTBroker> _mockBroker;
         Mock<IOptions<QueueTServiceOptions>> _mockServiceOptions;
-        Mock<IOptions<TaskOptions>> _mockOptions;
+        Mock<IOptions<TaskServiceOptions>> _mockOptions;
 
         TaskService _taskService;
         MethodInfo _syncTestMethod;
@@ -32,13 +32,13 @@ namespace QueueT.Tests.Tasks
             _mockServiceProvider = new Mock<IServiceProvider>();
             _mockBroker = new Mock<IQueueTBroker>();
             _mockServiceOptions = new Mock<IOptions<QueueTServiceOptions>>();
-            _mockOptions = new Mock<IOptions<TaskOptions>>();
+            _mockOptions = new Mock<IOptions<TaskServiceOptions>>();
 
             _mockServiceOptions.SetupGet(x => x.Value)
                 .Returns(new QueueTServiceOptions { Broker = _mockBroker.Object });
 
             _mockOptions.SetupGet(x => x.Value)
-                .Returns(new TaskOptions());
+                .Returns(new TaskServiceOptions());
 
             _taskService = new TaskService(
                 _mockLogger.Object,

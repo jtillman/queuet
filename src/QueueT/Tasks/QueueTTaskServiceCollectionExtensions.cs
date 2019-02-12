@@ -8,7 +8,7 @@ namespace QueueT.Tasks
 
     public static class QueueTTaskServiceCollectionExtensions
     {
-        public static QueueTServiceCollection UseTasks(this QueueTServiceCollection services, Action<TaskOptions> configure = null)
+        public static QueueTServiceCollection UseTasks(this QueueTServiceCollection services, Action<TaskServiceOptions> configure = null)
         {
             services.Services.AddOptions<QueueTServiceOptions>();
             services.AddQueueTMessageHandler<TaskService>();
@@ -16,7 +16,7 @@ namespace QueueT.Tasks
 
             if (null != configure)
             {
-                services.Services.Configure<TaskOptions>(config => configure(config));
+                services.Services.Configure<TaskServiceOptions>(config => configure(config));
             }
 
             return services;
@@ -29,7 +29,7 @@ namespace QueueT.Tasks
             return services;
         }
 
-        public static void RegisterTaskAttibutes(this TaskOptions options, Assembly assembly)
+        public static void RegisterTaskAttibutes(this TaskServiceOptions options, Assembly assembly)
         {
             assembly.GetTypes()
             .SelectMany(t => t.GetMethods())

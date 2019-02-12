@@ -27,7 +27,7 @@ namespace QueueT.Tasks
         private readonly IServiceProvider _serviceProvider;
 
         private readonly QueueTServiceOptions _appOptions;
-        private readonly TaskOptions _taskOptions;
+        private readonly TaskServiceOptions _taskOptions;
 
         private IDictionary<string, TaskDefinition> TaskDefinitionsByName { get; }
             = new Dictionary<string, TaskDefinition>();
@@ -39,7 +39,7 @@ namespace QueueT.Tasks
             ILogger<TaskService> logger,
             IServiceProvider serviceProvider,
             IOptions<QueueTServiceOptions> appOptions,
-            IOptions<TaskOptions> taskOptions)
+            IOptions<TaskServiceOptions> taskOptions)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
@@ -64,11 +64,11 @@ namespace QueueT.Tasks
             TaskDefinitionsByMethod.Add(taskDefinition.Method, taskDefinition);
         }
 
-        public async Task<TaskMessage> DelayAsync<T>(Expression<Action<T>> expression, DispatchOptions options = null) => await _DelayAsync(expression?.Body as MethodCallExpression, options);
+        public async Task<TaskMessage> DelayAsync<T>(Expression<Action<T>> expression, TaskDispatchOptions options = null) => await _DelayAsync(expression?.Body as MethodCallExpression, options);
 
-        public async Task<TaskMessage> DelayAsync<T>(Expression<Func<T, Task>> expression, DispatchOptions options = null) => await _DelayAsync(expression?.Body as MethodCallExpression, options);
+        public async Task<TaskMessage> DelayAsync<T>(Expression<Func<T, Task>> expression, TaskDispatchOptions options = null) => await _DelayAsync(expression?.Body as MethodCallExpression, options);
 
-        private async Task<TaskMessage> _DelayAsync(MethodCallExpression methodExpression, DispatchOptions options = null)
+        private async Task<TaskMessage> _DelayAsync(MethodCallExpression methodExpression, TaskDispatchOptions options = null)
         {
             if (null == methodExpression)
                 throw new ArgumentException("Expression must be a method call");
@@ -94,7 +94,7 @@ namespace QueueT.Tasks
             return definition;
         }
 
-        public async Task<TaskMessage> DelayAsync(MethodInfo methodInfo, IDictionary<string, object> arguments, DispatchOptions options = null)
+        public async Task<TaskMessage> DelayAsync(MethodInfo methodInfo, IDictionary<string, object> arguments, TaskDispatchOptions options = null)
         {
             if (methodInfo == null)
                 throw new ArgumentNullException(nameof(methodInfo));
@@ -105,7 +105,7 @@ namespace QueueT.Tasks
             return await DispatchAsync(definition, arguments, options);
         }
 
-        public async Task<string> DispatchAsync(TaskDefinition definition, byte[] encodedArguments, DispatchOptions options = null)
+        public async Task<string> DispatchAsync(TaskDefinition definition, byte[] encodedArguments, TaskDispatchOptions options = null)
         {
             var messageId = Guid.NewGuid().ToString();
 
@@ -125,7 +125,7 @@ namespace QueueT.Tasks
             return messageId;
         }
 
-        public async Task<TaskMessage> DispatchAsync(TaskDefinition definition, IDictionary<string, object> arguments, DispatchOptions options = null)
+        public async Task<TaskMessage> DispatchAsync(TaskDefinition definition, IDictionary<string, object> arguments, TaskDispatchOptions options = null)
         {
             var message = new TaskMessage
             {
