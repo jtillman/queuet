@@ -20,10 +20,10 @@ namespace AspNetCoreWebApp.Tasks
         [QueuedTask]
         public int Add(int right, int left) => right + left;
 
-        [QueuedTask(TaskName = "SubstractTask")]
+        [QueuedTask(Name = "SubstractTask")]
         public int Substract(int right, int left) => right - left;
 
-        [QueuedTask(TaskName = "DelayWrite")]
+        [QueuedTask(Name = "DelayWrite")]
         public async Task DelayWrite(string message, int seconds = 0)
         {
             await Task.Delay(seconds * 1000);

@@ -38,8 +38,8 @@ namespace QueueT.Tasks
             .ToList()
             .ForEach(entry =>
             {
-                var taskName = entry.attribute.TaskName ?? entry.method.GetDefaultTaskNameForMethod();
-                var queueName = entry.attribute.QueueName ?? options.DefaultQueueName;
+                var taskName = entry.attribute.Name ?? entry.method.GetDefaultTaskNameForMethod();
+                var queueName = entry.attribute.Queue ?? options.DefaultQueueName;
                 options.Tasks.Add(new TaskDefinition(taskName, entry.method, queueName));
             });
         } 
