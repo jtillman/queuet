@@ -73,6 +73,7 @@ namespace QueueT.Worker
                 }
                 await Task.WhenAny(taskList);
             }
+            await Task.WhenAll(taskList);
         }
 
         public async Task ProcessMessageAsync(QueueTMessage message, CancellationToken cancellationToken)
