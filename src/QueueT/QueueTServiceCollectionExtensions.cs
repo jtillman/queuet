@@ -9,6 +9,8 @@ namespace QueueT
     {
         public static QueueTServiceCollection AddQueueT(this IServiceCollection serviceCollection, Action<QueueTServiceOptions> configure = null)
         {
+            serviceCollection.AddTransient<IMessageDispatcher, MessageDispatcher>();
+
             if (null != configure)
                 serviceCollection.Configure(configure);
             return new QueueTServiceCollection(serviceCollection);

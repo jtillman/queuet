@@ -1,16 +1,16 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Newtonsoft.Json;
 using QueueT.Tasks;
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using Xunit;
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace QueueT.Tests.Tasks
 {
@@ -19,6 +19,8 @@ namespace QueueT.Tests.Tasks
     {
         Mock<IServiceProvider> _mockServiceProvider;
         Mock<IQueueTBroker> _mockBroker;
+        Mock<IMessageDispatcher> _mockDispatcher;
+
         TaskRegistry _taskRegistry;
         TaskService _taskService;
         TaskServiceOptions _taskServiceOptions;
@@ -30,6 +32,7 @@ namespace QueueT.Tests.Tasks
         {
             _mockServiceProvider = new Mock<IServiceProvider>();
             _mockBroker = new Mock<IQueueTBroker>();
+            _mockDispatcher = new Mock<IMessageDispatcher>();
 
             _taskServiceOptions = new TaskServiceOptions();
             _queueServiceOptions = new QueueTServiceOptions{ Broker = _mockBroker.Object };
@@ -44,7 +47,8 @@ namespace QueueT.Tests.Tasks
                 _mockServiceProvider.Object,
                 Options.Create(_queueServiceOptions),
                 Options.Create(_taskServiceOptions),
-                _taskRegistry);
+                _taskRegistry,
+                _mockDispatcher.Object);
 
             _syncTestMethod = typeof(TestTaskClass).GetMethod(nameof(TestTaskClass.Multiply));
             _asyncTestMethod = typeof(TestTaskClass).GetMethod(nameof(TestTaskClass.MultiplyAsync));
@@ -53,7 +57,7 @@ namespace QueueT.Tests.Tasks
         [Fact]
         public void DelayAsync_Throws_On_Null_Method()
         {
-            Assert.ThrowsAsync<ArgumentNullException>(async () => await _taskService.DelayAsync(null, null));
+            Assert.ThrowsAsync<ArgumentNullException>(async () => await _taskService.DelayAsync((Expression<Action<string>>)null, null));
         }
 
         [Fact]
@@ -70,29 +74,19 @@ namespace QueueT.Tests.Tasks
             var left = 5;
             var right = 6;
 
-            var serializedArguments = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(
-                new {
-                    left,
-                    right
-                }));
-
             var definition = new TaskDefinition(taskName, _syncTestMethod, queueName);
 
-            _mockBroker.Setup(broker => broker.SendAsync(queueName,
-                It.Is<QueueTMessage>(m =>
-                    new Guid(m.Id) != null && // Validate Id was set properly
-                    m.ContentType == TaskService.JsonContentType &&
-                    m.MessageType == TaskService.MessageType &&
-                    m.Properties[TaskService.TaskNamePropertyKey] == taskName &&
-                    m.EncodedBody.SequenceEqual(serializedArguments))))
-                .Returns(Task.CompletedTask)
+            _mockDispatcher.Setup(dispatcher => dispatcher.SendMessageAsync(
+                TaskService.MessageType,
+                It.Is<Dictionary<string, object>>(args => (int)args["left"] == left && (int)args["right"] == right),
+                It.IsAny<DispatchOptions>()))
+                .Returns(Task.FromResult(new QueueTMessage { }))
                 .Verifiable();
 
             _taskRegistry.AddTask(definition);
             var message = _taskService.DelayAsync<TestTaskClass>(c => c.Multiply(5, 6)).Result;
 
-            _mockBroker.Verify();
-
+            _mockDispatcher.Verify();
         }
 
         [Fact]
@@ -104,31 +98,18 @@ namespace QueueT.Tests.Tasks
             _taskRegistry.AddTask(new TaskDefinition(taskName, _syncTestMethod, queueName));
             var arguments = new Dictionary<string, object> { { "left", 5 }, { "right", 8 } };
 
-            var serializedArguments = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(
-                new
-                {
-                    left = 5,
-                    right = 8
-                }));
+            _mockDispatcher.Setup(dispatcher => dispatcher.SendMessageAsync(
+                TaskService.MessageType,
+                It.Is<Dictionary<string, object>>(args => (int)args["left"] == 5 && (int)args["right"] == 8),
+                It.IsAny<DispatchOptions>()))
+                .Returns(Task.FromResult(new QueueTMessage { }))
+                .Verifiable("Message is not being correctly dispatched");
 
-            _mockBroker.Setup(
-                d => d.SendAsync(
-                    queueName,
-                    
-                    It.Is<QueueTMessage>(m =>
-                        m.ContentType == TaskService.JsonContentType &&
-                        m.MessageType == TaskService.MessageType && 
-                        m.Properties[TaskService.TaskNamePropertyKey] == taskName &&
-                        m.EncodedBody.SequenceEqual(serializedArguments))))
-                    .Returns(Task.CompletedTask)
-                    .Verifiable("Message is not being correctly dispatched");
-
-            var message = _taskService.DelayAsync(_syncTestMethod, arguments).Result;
+            var message = _taskService.DelayAsync(_syncTestMethod, arguments, new DispatchOptions()).Result;
 
             _mockBroker.Verify();
 
             Assert.Equal(taskName, message.Name);
-            Assert.Equal(arguments, message.Arguments);
         }
 
         [Fact]

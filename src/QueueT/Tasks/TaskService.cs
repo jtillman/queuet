@@ -16,8 +16,6 @@ namespace QueueT.Tasks
 {
     public class TaskService : ITaskService, IMessageHandler
     {
-        public const string JsonContentType = "application/json";
-
         public const string MessageType = "task";
 
         public const string TaskNamePropertyKey = "taskName";
@@ -32,25 +30,30 @@ namespace QueueT.Tasks
 
         private readonly ITaskRegistry _taskRegistry;
 
+        private readonly IMessageDispatcher _messageDispatcher;
+
+
         public TaskService(
             ILogger<TaskService> logger,
             IServiceProvider serviceProvider,
             IOptions<QueueTServiceOptions> appOptions,
             IOptions<TaskServiceOptions> taskOptions,
-            ITaskRegistry taskRegistry)
+            ITaskRegistry taskRegistry,
+            IMessageDispatcher messageDispatcher)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
             _appOptions = appOptions.Value;
             _taskOptions = taskOptions.Value;
             _taskRegistry = taskRegistry;
+            _messageDispatcher = messageDispatcher;
         }
 
-        public async Task<TaskMessage> DelayAsync<T>(Expression<Action<T>> expression, TaskDispatchOptions options = null) => await _DelayAsync(expression?.Body as MethodCallExpression, options);
+        public async Task<TaskMessage> DelayAsync<T>(Expression<Action<T>> expression, DispatchOptions options = null) => await _DelayAsync(expression?.Body as MethodCallExpression, options);
 
-        public async Task<TaskMessage> DelayAsync<T>(Expression<Func<T, Task>> expression, TaskDispatchOptions options = null) => await _DelayAsync(expression?.Body as MethodCallExpression, options);
+        public async Task<TaskMessage> DelayAsync<T>(Expression<Func<T, Task>> expression, DispatchOptions options = null) => await _DelayAsync(expression?.Body as MethodCallExpression, options);
 
-        private async Task<TaskMessage> _DelayAsync(MethodCallExpression methodExpression, TaskDispatchOptions options = null)
+        private async Task<TaskMessage> _DelayAsync(MethodCallExpression methodExpression, DispatchOptions options = null)
         {
             if (null == methodExpression)
                 throw new ArgumentException("Expression must be a method call");
@@ -61,7 +64,7 @@ namespace QueueT.Tasks
             return await DispatchAsync(definition, arguments, options);
         }
 
-        public async Task<TaskMessage> DelayAsync(MethodInfo methodInfo, IDictionary<string, object> arguments, TaskDispatchOptions options = null)
+        public async Task<TaskMessage> DelayAsync(MethodInfo methodInfo, object arguments, DispatchOptions options = null)
         {
             if (methodInfo == null)
                 throw new ArgumentNullException(nameof(methodInfo));
@@ -70,61 +73,25 @@ namespace QueueT.Tasks
             return await DispatchAsync(definition, arguments, options);
         }
 
-        public async Task<string> DispatchAsync(TaskDefinition definition, byte[] encodedArguments, TaskDispatchOptions options = null)
+        public async Task<TaskMessage> DelayAsync(string taskName, object arguments, DispatchOptions options = null)
         {
-            var messageId = Guid.NewGuid().ToString();
-
-            var queueTMessage = new QueueTMessage
-            {
-                Id = messageId,
-                ContentType = JsonContentType,
-                Properties = new Dictionary<string, string> { { TaskNamePropertyKey, definition.Name } },
-                MessageType = MessageType,
-                EncodedBody = encodedArguments,
-                Created = DateTime.UtcNow
-            };
-
-            var targetQueue = options?.Queue ?? definition.QueueName ?? _taskOptions.DefaultQueueName ?? _appOptions.DefaultQueueName;
-
-            await _appOptions.Broker.SendAsync(targetQueue, queueTMessage);
-            return messageId;
+            var definition = _taskRegistry.GetTaskByName(taskName);
+            return await DispatchAsync(definition, arguments, options);
         }
 
-        public async Task<TaskMessage> DispatchAsync(TaskDefinition definition, IDictionary<string, object> arguments, TaskDispatchOptions options = null)
+        private async Task<TaskMessage> DispatchAsync(TaskDefinition definition, object arguments, DispatchOptions options = null)
         {
-            var message = new TaskMessage
+            options = options ?? new DispatchOptions();
+            options.Queue = options.Queue ?? definition.QueueName ?? _taskOptions.DefaultQueueName;
+
+            options.Properties[TaskNamePropertyKey] = definition.Name;
+
+            var message = await _messageDispatcher.SendMessageAsync(MessageType, arguments, options);
+
+            return new TaskMessage
             {
-                Name = definition.Name,
-                Arguments = arguments
+                Name = definition.Name
             };
-
-            byte[] serializedArguments = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(arguments));
-
-            await DispatchAsync(definition, serializedArguments, options);
-
-            return message;
-        }
-
-
-        public object[] GetParametersForTask(TaskDefinition taskDefinition, IDictionary<string, object> taskArguments)
-        {
-            var argumentList = new List<object>(taskDefinition.Parameters.Length);
-            var missingArguments = new List<string>();
-
-            foreach (var paramInfo in taskDefinition.Parameters)
-            {
-                if (taskArguments.TryGetValue(paramInfo.Name, out var value))
-                    argumentList.Add(value);
-                else if (paramInfo.IsOptional)
-                    argumentList.Add(paramInfo.DefaultValue);
-                else
-                    missingArguments.Add(paramInfo.Name);
-            }
-
-            if (0 < missingArguments.Count)
-                throw new ArgumentException($"Message for task [{taskDefinition.Name}] missing arguments: {string.Join(", ", missingArguments)}");
-
-            return argumentList.ToArray();
         }
 
         public async Task<object> ExecuteTaskMessageAsync(TaskMessage message)
