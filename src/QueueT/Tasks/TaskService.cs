@@ -27,41 +27,23 @@ namespace QueueT.Tasks
         private readonly IServiceProvider _serviceProvider;
 
         private readonly QueueTServiceOptions _appOptions;
+
         private readonly TaskServiceOptions _taskOptions;
 
-        private IDictionary<string, TaskDefinition> TaskDefinitionsByName { get; }
-            = new Dictionary<string, TaskDefinition>();
-
-        private IDictionary<MethodInfo, TaskDefinition> TaskDefinitionsByMethod { get; }
-            = new Dictionary<MethodInfo, TaskDefinition>();
+        private readonly ITaskRegistry _taskRegistry;
 
         public TaskService(
             ILogger<TaskService> logger,
             IServiceProvider serviceProvider,
             IOptions<QueueTServiceOptions> appOptions,
-            IOptions<TaskServiceOptions> taskOptions)
+            IOptions<TaskServiceOptions> taskOptions,
+            ITaskRegistry taskRegistry)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
             _appOptions = appOptions.Value;
             _taskOptions = taskOptions.Value;
-
-            foreach (var taskDefinition in _taskOptions.Tasks)
-                AddTask(taskDefinition);
-        }
-
-        public void AddTask(TaskDefinition taskDefinition)
-        {
-            if (taskDefinition == null)
-                throw new ArgumentNullException(nameof(taskDefinition));
-
-            if (TaskDefinitionsByName.ContainsKey(taskDefinition.Name))
-                throw new ArgumentException($"Attempting to add task with duplcate name [{taskDefinition.Name}]");
-
-            _logger.LogInformation($"Registering task: {taskDefinition.Name}");
-
-            TaskDefinitionsByName.Add(taskDefinition.Name, taskDefinition);
-            TaskDefinitionsByMethod.Add(taskDefinition.Method, taskDefinition);
+            _taskRegistry = taskRegistry;
         }
 
         public async Task<TaskMessage> DelayAsync<T>(Expression<Action<T>> expression, TaskDispatchOptions options = null) => await _DelayAsync(expression?.Body as MethodCallExpression, options);
@@ -73,25 +55,10 @@ namespace QueueT.Tasks
             if (null == methodExpression)
                 throw new ArgumentException("Expression must be a method call");
 
-            if (!TaskDefinitionsByMethod.TryGetValue(methodExpression.Method, out var taskDefinition))
-            {
-                throw new ArgumentException("Method is not registered task");
-            }
+            var definition = _taskRegistry.GetTaskByMethod(methodExpression.Method);
 
-            var definition = GetForMethod(methodExpression.Method);
             var arguments = definition.CreateArgumentsFromCall(methodExpression);
             return await DispatchAsync(definition, arguments, options);
-        }
-
-        internal TaskDefinition GetForMethod(MethodInfo methodInfo)
-        {
-            if (methodInfo == null)
-                throw new ArgumentNullException(nameof(methodInfo));
-
-            if (!TaskDefinitionsByMethod.TryGetValue(methodInfo, out TaskDefinition definition))
-                throw new ArgumentException($"Method [{methodInfo.Name}] must be registered before dispatching."); // TODO: Make custom exception
-
-            return definition;
         }
 
         public async Task<TaskMessage> DelayAsync(MethodInfo methodInfo, IDictionary<string, object> arguments, TaskDispatchOptions options = null)
@@ -99,9 +66,7 @@ namespace QueueT.Tasks
             if (methodInfo == null)
                 throw new ArgumentNullException(nameof(methodInfo));
 
-            if (!TaskDefinitionsByMethod.TryGetValue(methodInfo, out TaskDefinition definition))
-                throw new ArgumentException($"Method [{methodInfo.Name}] must be registered before dispatching."); // TODO: Make custom exception
-
+            var definition = _taskRegistry.GetTaskByMethod(methodInfo);
             return await DispatchAsync(definition, arguments, options);
         }
 
@@ -167,8 +132,7 @@ namespace QueueT.Tasks
             if (null == message)
                 throw new ArgumentNullException(nameof(message));
 
-            if (!TaskDefinitionsByName.TryGetValue(message.Name, out var taskDefinition))
-                throw new ArgumentException($"Task Naame [{message.Name}] is not registered."); // TODO: Make custom exception
+            var taskDefinition = _taskRegistry.GetTaskByName(message.Name);
 
             var methodClass = ActivatorUtilities.GetServiceOrCreateInstance(_serviceProvider, taskDefinition.Method.DeclaringType);
 
@@ -190,8 +154,7 @@ namespace QueueT.Tasks
             if (!message.Properties.TryGetValue(TaskNamePropertyKey, out var taskName))
                 throw new ArgumentException("TaskName not present in message");
 
-            if (!TaskDefinitionsByName.TryGetValue(taskName, out var definition))
-                throw new ArgumentException($"Received task with unknown name {taskName}");
+            var definition = _taskRegistry.GetTaskByName(taskName);
 
             var sw = new Stopwatch();
             sw.Start();

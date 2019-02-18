@@ -10,9 +10,10 @@ namespace QueueT.Tasks
     {
         public static QueueTServiceCollection UseTasks(this QueueTServiceCollection services, Action<TaskServiceOptions> configure = null)
         {
+            services.Services.AddSingleton<ITaskRegistry, TaskRegistry>();
             services.Services.AddOptions<QueueTServiceOptions>();
             services.AddQueueTMessageHandler<TaskService>();
-            services.Services.AddSingleton<ITaskService>(sp => sp.GetRequiredService<TaskService>());
+            services.Services.AddScoped<ITaskService>(sp => sp.GetRequiredService<TaskService>());
 
             if (null != configure)
             {
@@ -24,7 +25,7 @@ namespace QueueT.Tasks
 
         public static QueueTServiceCollection AddQueueTMessageHandler<T>(this QueueTServiceCollection services) where T : class, IMessageHandler
         {
-            services.Services.AddSingleton<T>();
+            services.Services.AddScoped<T>();
             services.Services.Configure<QueueTServiceOptions>(options => options.RegisterHandlerType<T>());
             return services;
         }
