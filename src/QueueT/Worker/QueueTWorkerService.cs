@@ -14,7 +14,6 @@ namespace QueueT.Worker
     {
         ILogger<QueueTWorkerService> _logger;
         QueueTServiceOptions _options;
-        IList<IMessageHandler> _messageHandlers = new List<IMessageHandler>();
         IServiceProvider _serviceProvider;
 
         public QueueTWorkerService(
@@ -29,12 +28,6 @@ namespace QueueT.Worker
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            foreach(var handlerType in _options.MessageHandlerTypes)
-            {
-                _logger.LogInformation($"Retrieve instance of handler: {handlerType.Name}");
-                _messageHandlers.Add(_serviceProvider.GetRequiredService(handlerType) as IMessageHandler);
-            }
-
             _logger.LogInformation("Starting to receive from queues");
 
             var queueIndex = 0;
@@ -78,12 +71,16 @@ namespace QueueT.Worker
 
         public async Task ProcessMessageAsync(QueueTMessage message, CancellationToken cancellationToken)
         {
-            foreach(var messageHandler in _messageHandlers)
+            foreach(var handlerType in _options.MessageHandlerTypes)
             {
-                if (!messageHandler.CanHandleMessage(message))
-                    continue;
-                await messageHandler.HandleMessage(message);
-                return;
+                using (var scope = _serviceProvider.CreateScope()){
+                    var messageHandler = scope.ServiceProvider.GetRequiredService(handlerType) as IMessageHandler;
+
+                    if (!messageHandler.CanHandleMessage(message))
+                        continue;
+                    await messageHandler.HandleMessage(message);
+                    return;
+                }
             }
 
             // There are no handlers for this message
