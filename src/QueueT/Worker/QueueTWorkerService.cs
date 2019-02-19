@@ -71,18 +71,30 @@ namespace QueueT.Worker
 
         public async Task ProcessMessageAsync(QueueTMessage message, CancellationToken cancellationToken)
         {
-            foreach(var handlerType in _options.MessageHandlerTypes)
+            try
             {
-                using (var scope = _serviceProvider.CreateScope()){
-                    var messageHandler = scope.ServiceProvider.GetRequiredService(handlerType) as IMessageHandler;
+                foreach (var handlerType in _options.MessageHandlerTypes)
+                {
+                    using (var scope = _serviceProvider.CreateScope())
+                    {
+                        var messageHandler = ActivatorUtilities.CreateInstance(scope.ServiceProvider, handlerType) as IMessageHandler;
 
-                    if (!messageHandler.CanHandleMessage(message))
-                        continue;
-                    await messageHandler.HandleMessage(message);
-                    return;
+                        if (!messageHandler.CanHandleMessage(message))
+                            continue;
+                        await messageHandler.HandleMessage(message);
+                        return;
+                    }
                 }
             }
-
+            catch (Exception ex)
+            {
+                if (ex is MessageProcessingException)
+                {
+                    throw;
+                }
+                _logger.LogError(ex, "Application Exception while proccessing message");
+                throw new MessageProcessingException(innerException: ex);
+            }
             // There are no handlers for this message
             throw new MessageProcessingException(MessageAction.Acknowledge, $"No plugins registered that may handle this message");
         }

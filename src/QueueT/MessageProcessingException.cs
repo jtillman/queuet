@@ -7,7 +7,10 @@ namespace QueueT
     {
         public MessageAction Action { get; }
 
-        public MessageProcessingException(MessageAction action = MessageAction.Acknowledge, string message = null) : base(message)
+        public MessageProcessingException(
+            MessageAction action = MessageAction.Acknowledge,
+            string message = null,
+            Exception innerException = null) : base(message, innerException)
         {
             Action = action;
         }

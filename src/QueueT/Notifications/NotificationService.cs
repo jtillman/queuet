@@ -10,10 +10,10 @@ namespace QueueT.Notifications
 
     public enum PartyNotifications
     {
-        [Notification("party.started", typeof(PartyEvent))]
+        [TopicAttribute("party.started", typeof(PartyEvent))]
         Started,
 
-        [Notification("party.ended", typeof(PartyEvent))]
+        [TopicAttribute("party.ended", typeof(PartyEvent))]
         Ended
     }
 

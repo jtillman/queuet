@@ -8,18 +8,19 @@ namespace QueueT.Notifications
     {
         private readonly ILogger<NotificationDispatcher> _logger;
 
-        private readonly NotificationRegistry _notificationRegistry;
+        private readonly INotificationRegistry _notificationRegistry;
 
         private readonly IMessageDispatcher _messageDispatcher;
 
 
         public NotificationDispatcher(
             ILogger<NotificationDispatcher> logger,
-            NotificationRegistry notificationRegistry,
+            INotificationRegistry notificationRegistry,
             IMessageDispatcher messageDispatcher)
         {
             _logger = logger;
             _messageDispatcher = messageDispatcher;
+            _notificationRegistry = notificationRegistry;
         }
 
         // Subscriptions
@@ -33,6 +34,6 @@ namespace QueueT.Notifications
             await _messageDispatcher.SendMessageAsync(NotificationMessage.MessageType, value, options);
         }
 
-        public async Task NotifyAsync<T>(Enum topicEnumValue, T value, DispatchOptions dispatchOptions = null) => await NotifyAsync(topicEnumValue, value, dispatchOptions);
+        public async Task NotifyAsync<T>(Enum topicEnumValue, T value, DispatchOptions dispatchOptions = null) => await NotifyAsync(topicEnumValue, value as object, dispatchOptions);
     }
 }

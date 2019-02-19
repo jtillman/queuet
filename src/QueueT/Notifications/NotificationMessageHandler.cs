@@ -14,14 +14,14 @@ namespace QueueT.Notifications
 
         private readonly ITaskService _taskService;
 
-        private readonly NotificationRegistry _notificationRegistry;
+        private readonly INotificationRegistry _notificationRegistry;
 
         private readonly NotificationOptions _options;
 
         public NotificationMessageHandler(
             ILogger<NotificationMessageHandler> logger,
             IOptions<NotificationOptions> options,
-            NotificationRegistry notificationRegistry,
+            INotificationRegistry notificationRegistry,
             ITaskService taskService)
         {
             _logger = logger;

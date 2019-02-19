@@ -1,11 +1,13 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace QueueT.Notifications
 {
-    public class NotificationRegistry
+
+    public class NotificationRegistry : INotificationRegistry
     {
         private ILogger<NotificationRegistry> _logger;
 
@@ -19,9 +21,21 @@ namespace QueueT.Notifications
             = new Dictionary<Enum, NotificationDefinition>();
 
         public NotificationRegistry(
-            ILogger<NotificationRegistry> logger)
+            ILogger<NotificationRegistry> logger,
+            IOptions<NotificationOptions> options)
         {
             _logger = logger;
+
+            foreach (var notifications in options.Value.Notifications)
+            {
+                RegisteryNotification(notifications);
+            }
+
+            foreach(var subscription in options.Value.NotificationSubscriptions)
+            {
+                RegisterSubscription(subscription);
+            }
+
         }
 
         public void RegisteryNotification(NotificationDefinition notificationDefinition)

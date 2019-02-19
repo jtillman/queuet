@@ -6,6 +6,8 @@ namespace QueueT
     {
         public IServiceCollection Services { get; }
 
-        public QueueTServiceCollection(IServiceCollection services) { Services = services; }
+        public QueueTServiceCollection(IServiceCollection services) {
+            Services = services;
+        }
     }
 }
