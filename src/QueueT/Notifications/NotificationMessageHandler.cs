@@ -1,8 +1,11 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using QueueT.Tasks;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -42,13 +45,28 @@ namespace QueueT.Notifications
             if (0 == subscriptions.Length)
                 return;
 
-            var argument = JsonConvert.DeserializeObject(Encoding.UTF8.GetString(message.EncodedBody));
+            JObject argument = JsonConvert.DeserializeObject(Encoding.UTF8.GetString(message.EncodedBody)) as JObject;
+            var properties = argument.Properties().ToArray();
+
             foreach (var subscription in subscriptions)
             {
                 var taskArguements = new Dictionary<string, object>();
                 var options = new DispatchOptions{ Queue = subscription.TaskQueue ?? _options.DefaultQueueName };
-                
-                await _taskService.DelayAsync(subscription.Method, argument, options);
+
+                foreach (var parameter in subscription.Parameters)
+                {
+                    var property = properties.FirstOrDefault(x => x.Name.Equals(parameter.Name, StringComparison.InvariantCultureIgnoreCase));
+                    if (null != property)
+                    {
+                        taskArguements[parameter.Name] = property.Value;
+                    }
+                    else if (!parameter.IsOptional)
+                    {
+                        _logger.LogCritical($"No matching parameter for parameter: {parameter.Name}");
+                    }
+                }
+
+                await _taskService.DelayAsync(subscription.Method, taskArguements, options);
             }
         }
     }
