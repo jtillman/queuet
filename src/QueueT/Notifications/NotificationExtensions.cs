@@ -5,6 +5,47 @@ using System.Reflection;
 
 namespace QueueT.Notifications
 {
+    public static class NotificationAttributeExtensions
+    {
+
+        public static NotificationSubscription RegisterSubscription(this NotificationOptions options, NotificationDefinition notification, MethodInfo method, string taskQueue = null)
+        {
+            var subscription = new NotificationSubscription(notification, method, taskQueue);
+            options.NotificationSubscriptions.Add(subscription);
+            return subscription;
+        }
+
+        public static NotificationSubscription RegisterSubscription(this NotificationOptions options, Enum notificationEnum, MethodInfo method, string taskQueue = null)
+        {
+            var notification = options.Notifications.First(definition => notificationEnum.Equals(definition.EnumValue));
+            return options.RegisterSubscription(notification, method, taskQueue);
+        }
+
+        public static NotificationSubscription RegisterSubscription(this NotificationOptions options, MethodInfo method, string topic, string taskQueue = null)
+        {
+            var notification = options.Notifications.First(definition => definition.Topic == topic);
+            return options.RegisterSubscription(notification, method, taskQueue);
+        }
+
+        public static void RegisterSubscriptionAttributes(this NotificationOptions options, params Assembly[] assemblies)
+        {
+
+            if (0 == assemblies.Length)
+            {
+                assemblies = new Assembly[1] { Assembly.GetCallingAssembly() };
+            }
+
+            assemblies
+                .SelectMany(assembly => assembly.GetTypes())
+                .Where(type => type.IsClass)
+                .SelectMany(type=>type.GetMethods())
+                .Select(methodInfo => new { methodInfo, attribute = methodInfo.GetCustomAttribute<SubscriptionAttribute>(false) })
+                .Where(entry => null != entry.attribute)
+                .ToList()
+                .ForEach(entry => options.RegisterSubscription(entry.attribute.Notification, entry.methodInfo, entry.attribute.Queue));
+        }
+    }
+
     public static class NotificationExtensions
     {
         public const string NotificationEnumSuffix = "notifications";
@@ -61,7 +102,6 @@ namespace QueueT.Notifications
                 assemblies = new Assembly[1] { Assembly.GetCallingAssembly() };
             }
 
-            var assem = assemblies[0];
             assemblies
                 .SelectMany(assembly => assembly.GetTypes())
                 .Where(type => type.IsEnum)
