@@ -8,26 +8,43 @@ namespace QueueT.Notifications
     public static class NotificationAttributeExtensions
     {
 
-        public static NotificationSubscription RegisterSubscription(this NotificationOptions options, NotificationDefinition notification, MethodInfo method, string taskQueue = null)
+        public static NotificationSubscription RegisterSubscription(
+            this NotificationOptions options,
+            NotificationDefinition notification,
+            MethodInfo method,
+            string messageParameterName,
+            string taskQueue = null)
         {
-            var subscription = new NotificationSubscription(notification, method, taskQueue);
+            var subscription = new NotificationSubscription(notification, method, messageParameterName, taskQueue);
             options.NotificationSubscriptions.Add(subscription);
             return subscription;
         }
 
-        public static NotificationSubscription RegisterSubscription(this NotificationOptions options, Enum notificationEnum, MethodInfo method, string taskQueue = null)
+        public static NotificationSubscription RegisterSubscription(
+            this NotificationOptions options,
+            Enum notificationEnum,
+            MethodInfo method,
+            string messageParameterName,
+            string taskQueue = null)
         {
             var notification = options.Notifications.First(definition => notificationEnum.Equals(definition.EnumValue));
-            return options.RegisterSubscription(notification, method, taskQueue);
+            return options.RegisterSubscription(notification, method, messageParameterName, taskQueue);
         }
 
-        public static NotificationSubscription RegisterSubscription(this NotificationOptions options, MethodInfo method, string topic, string taskQueue = null)
+        public static NotificationSubscription RegisterSubscription(
+            this NotificationOptions options,
+            MethodInfo method,
+            string topic,
+            string messageParameterName,
+            string taskQueue = null)
         {
             var notification = options.Notifications.First(definition => definition.Topic == topic);
-            return options.RegisterSubscription(notification, method, taskQueue);
+            return options.RegisterSubscription(notification, method, messageParameterName, taskQueue);
         }
 
-        public static void RegisterSubscriptionAttributes(this NotificationOptions options, params Assembly[] assemblies)
+        public static void RegisterSubscriptionAttributes(
+            this NotificationOptions options,
+            params Assembly[] assemblies)
         {
 
             if (0 == assemblies.Length)
@@ -42,7 +59,12 @@ namespace QueueT.Notifications
                 .Select(methodInfo => new { methodInfo, attribute = methodInfo.GetCustomAttribute<SubscriptionAttribute>(false) })
                 .Where(entry => null != entry.attribute)
                 .ToList()
-                .ForEach(entry => options.RegisterSubscription(entry.attribute.Notification, entry.methodInfo, entry.attribute.Queue));
+                .ForEach(entry => options.RegisterSubscription(
+                    entry.attribute.Notification,
+                    entry.methodInfo,
+                    // We need to be more descriptive about the parameter selection
+                    entry.attribute.MessageProperty ?? entry.methodInfo.GetParameters().FirstOrDefault()?.Name,
+                    entry.attribute.Queue));
         }
     }
 
@@ -52,7 +74,9 @@ namespace QueueT.Notifications
         public const string NotificationNamePattern = "{notification}";
         public const string TopicNamePattern = "{topic}";
 
-        public static void RegisterNotificationEnum(this NotificationOptions notificationOptions, Type notificationEnumType)
+        public static void RegisterNotificationEnum(
+            this NotificationOptions notificationOptions,
+            Type notificationEnumType)
         {
             if (notificationEnumType == null)
             {
@@ -95,7 +119,9 @@ namespace QueueT.Notifications
             }
         }
 
-        public static void RegisterNotificationAttributes(this NotificationOptions notificationOptions, params Assembly[] assemblies)
+        public static void RegisterNotificationAttributes(
+            this NotificationOptions notificationOptions,
+            params Assembly[] assemblies)
         {
             if (0 == assemblies.Length)
             {
@@ -111,7 +137,9 @@ namespace QueueT.Notifications
                 .ForEach(entry => notificationOptions.RegisterNotificationEnum(entry.enumType));
         }
 
-        public static QueueTServiceCollection ConfigureNotifications(this QueueTServiceCollection serviceCollection, Action<NotificationOptions> configure)
+        public static QueueTServiceCollection ConfigureNotifications(
+            this QueueTServiceCollection serviceCollection,
+            Action<NotificationOptions> configure)
         {
             serviceCollection.Services.Configure<NotificationOptions>(options => configure(options));
             return serviceCollection;

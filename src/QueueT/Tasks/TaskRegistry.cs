@@ -47,14 +47,14 @@ namespace QueueT.Tasks
         {
             if (TaskDefinitionsByName.TryGetValue(taskName, out var definition))
                 return definition;
-            throw new ArgumentException($"Task Naame [{taskName}] is not registered."); // TODO: Make custom exception
+            return null;
         }
 
         public TaskDefinition GetTaskByMethod(MethodInfo methodInfo)
         {
             if (TaskDefinitionsByMethod.TryGetValue(methodInfo, out var definition))
                 return definition;
-            throw new ArgumentException($"Method [{methodInfo.Name}] must be registered before dispatching."); // TODO: Make custom exception
+            return null;
         }
     }
 }

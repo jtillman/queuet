@@ -7,6 +7,8 @@ namespace QueueT.Notifications
     {
         public Enum Notification { get; }
 
+        public string MessageProperty { get; set; }
+
         public string Queue { get; set; }
 
         public SubscriptionAttribute(object notification){

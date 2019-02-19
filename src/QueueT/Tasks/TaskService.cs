@@ -49,6 +49,16 @@ namespace QueueT.Tasks
             _messageDispatcher = messageDispatcher;
         }
 
+        private TaskDefinition GetTaskDefinition(MethodInfo methodInfo)
+        {
+            return _taskRegistry.GetTaskByMethod(methodInfo) ?? throw new ArgumentException($"Method [{methodInfo.Name}] must be registered before dispatching.");
+        }
+
+        private TaskDefinition GetTaskDefinition(string taskName)
+        {
+            return _taskRegistry.GetTaskByName(taskName) ?? throw new ArgumentException($"Task Naame [{taskName}] is not registered.");
+        }
+
         public async Task<TaskMessage> DelayAsync<T>(Expression<Action<T>> expression, DispatchOptions options = null) => await _DelayAsync(expression?.Body as MethodCallExpression, options);
 
         public async Task<TaskMessage> DelayAsync<T>(Expression<Func<T, Task>> expression, DispatchOptions options = null) => await _DelayAsync(expression?.Body as MethodCallExpression, options);
@@ -58,7 +68,7 @@ namespace QueueT.Tasks
             if (null == methodExpression)
                 throw new ArgumentException("Expression must be a method call");
 
-            var definition = _taskRegistry.GetTaskByMethod(methodExpression.Method);
+            var definition = GetTaskDefinition(methodExpression.Method);
 
             var arguments = definition.CreateArgumentsFromCall(methodExpression);
             return await DispatchAsync(definition, arguments, options);
@@ -69,13 +79,13 @@ namespace QueueT.Tasks
             if (methodInfo == null)
                 throw new ArgumentNullException(nameof(methodInfo));
 
-            var definition = _taskRegistry.GetTaskByMethod(methodInfo);
+            var definition = GetTaskDefinition(methodInfo);
             return await DispatchAsync(definition, arguments, options);
         }
 
         public async Task<TaskMessage> DelayAsync(string taskName, object arguments, DispatchOptions options = null)
         {
-            var definition = _taskRegistry.GetTaskByName(taskName);
+            var definition = GetTaskDefinition(taskName);
             return await DispatchAsync(definition, arguments, options);
         }
 
@@ -99,7 +109,7 @@ namespace QueueT.Tasks
             if (null == message)
                 throw new ArgumentNullException(nameof(message));
 
-            var taskDefinition = _taskRegistry.GetTaskByName(message.Name);
+            var taskDefinition = GetTaskDefinition(message.Name);
 
             var methodClass = ActivatorUtilities.GetServiceOrCreateInstance(_serviceProvider, taskDefinition.Method.DeclaringType);
 
@@ -121,7 +131,7 @@ namespace QueueT.Tasks
             if (!message.Properties.TryGetValue(TaskNamePropertyKey, out var taskName))
                 throw new ArgumentException("TaskName not present in message");
 
-            var definition = _taskRegistry.GetTaskByName(taskName);
+            var definition = GetTaskDefinition(taskName);
 
             var sw = new Stopwatch();
             sw.Start();

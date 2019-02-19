@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using QueueT.Tasks;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,6 +11,8 @@ namespace QueueT.Notifications
     public class NotificationRegistry : INotificationRegistry
     {
         private ILogger<NotificationRegistry> _logger;
+
+        private ITaskRegistry _taskRegistry;
 
         private Dictionary<NotificationDefinition, List<NotificationSubscription>> NotificationSubscriptions { get; }
             = new Dictionary<NotificationDefinition, List<NotificationSubscription>>();
@@ -22,9 +25,11 @@ namespace QueueT.Notifications
 
         public NotificationRegistry(
             ILogger<NotificationRegistry> logger,
+            ITaskRegistry taskRegistry,
             IOptions<NotificationOptions> options)
         {
             _logger = logger;
+            _taskRegistry = taskRegistry;
 
             foreach (var notifications in options.Value.Notifications)
             {
@@ -90,11 +95,16 @@ namespace QueueT.Notifications
                 NotificationSubscriptions[subscription.Notification] = subscriptions;
             }
 
-            if (subscriptions.Any(s=>s.Notification == subscription.Notification && s.Method == subscription.Method))
+            if (subscriptions.Any(s => s.Notification == subscription.Notification && s.Method == subscription.Method))
             {
                 throw new ArgumentException($"Already found subscription for topic to method Topic={subscription.Notification.Topic} Method={subscription.Method}");
             }
-            
+
+            if (null == _taskRegistry.GetTaskByMethod(subscription.Method))
+            {
+                throw new ArgumentException($"Method {subscription.Method} must be registered as task to accept notifications");
+            }
+
             NotificationSubscriptions[subscription.Notification].Add(subscription);
         }
 
