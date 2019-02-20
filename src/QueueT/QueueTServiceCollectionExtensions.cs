@@ -12,7 +12,7 @@ namespace QueueT
             serviceCollection.AddTransient<IMessageDispatcher, MessageDispatcher>();
 
             serviceCollection.AddSingleton<Notifications.INotificationRegistry, Notifications.NotificationRegistry>();
-            serviceCollection.AddScoped<Notifications.INotificationDispatcher, Notifications.NotificationDispatcher>();
+            serviceCollection.AddScoped<Notifications.INotificationService, Notifications.NotificationDispatcher>();
 
             if (null != configure)
                 serviceCollection.Configure<QueueTServiceOptions>(options=> {

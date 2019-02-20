@@ -4,17 +4,17 @@ using System.Threading.Tasks;
 
 namespace QueueT.Notifications
 {
-    public class NotificationDispatcher : INotificationDispatcher
+    public class NotificationService : INotificationService
     {
-        private readonly ILogger<NotificationDispatcher> _logger;
+        private readonly ILogger<NotificationService> _logger;
 
         private readonly INotificationRegistry _notificationRegistry;
 
         private readonly IMessageDispatcher _messageDispatcher;
 
 
-        public NotificationDispatcher(
-            ILogger<NotificationDispatcher> logger,
+        public NotificationService(
+            ILogger<NotificationService> logger,
             INotificationRegistry notificationRegistry,
             IMessageDispatcher messageDispatcher)
         {
