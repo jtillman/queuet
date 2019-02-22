@@ -8,6 +8,8 @@ namespace QueueT.Tasks
 
     public interface ITaskService
     {
+        ITaskRegistry Registry { get; }
+
         Task<TaskMessage> DelayAsync<T>(Expression<Action<T>> expression, DispatchOptions options = null);
 
         Task<TaskMessage> DelayAsync<T>(Expression<Func<T, Task>> expression, DispatchOptions options = null);

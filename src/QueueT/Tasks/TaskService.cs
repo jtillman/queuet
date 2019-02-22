@@ -28,10 +28,9 @@ namespace QueueT.Tasks
 
         private readonly TaskServiceOptions _taskOptions;
 
-        private readonly ITaskRegistry _taskRegistry;
-
         private readonly IMessageDispatcher _messageDispatcher;
 
+        public ITaskRegistry Registry { get; }
 
         public TaskService(
             ILogger<TaskService> logger,
@@ -45,18 +44,18 @@ namespace QueueT.Tasks
             _serviceProvider = serviceProvider;
             _appOptions = appOptions.Value;
             _taskOptions = taskOptions.Value;
-            _taskRegistry = taskRegistry;
+            Registry = taskRegistry;
             _messageDispatcher = messageDispatcher;
         }
 
         private TaskDefinition GetTaskDefinition(MethodInfo methodInfo)
         {
-            return _taskRegistry.GetTaskByMethod(methodInfo) ?? throw new ArgumentException($"Method [{methodInfo.Name}] must be registered before dispatching.");
+            return Registry.GetTaskByMethod(methodInfo) ?? throw new ArgumentException($"Method [{methodInfo.Name}] must be registered before dispatching.");
         }
 
         private TaskDefinition GetTaskDefinition(string taskName)
         {
-            return _taskRegistry.GetTaskByName(taskName) ?? throw new ArgumentException($"Task Naame [{taskName}] is not registered.");
+            return Registry.GetTaskByName(taskName) ?? throw new ArgumentException($"Task Naame [{taskName}] is not registered.");
         }
 
         public async Task<TaskMessage> DelayAsync<T>(Expression<Action<T>> expression, DispatchOptions options = null) => await _DelayAsync(expression?.Body as MethodCallExpression, options);

@@ -10,11 +10,13 @@ namespace QueueT.Tasks
     {
         public ILogger<TaskRegistry> _logger;
 
-        private IDictionary<string, TaskDefinition> TaskDefinitionsByName { get; }
+        private Dictionary<string, TaskDefinition> TaskDefinitionsByName { get; }
             = new Dictionary<string, TaskDefinition>();
 
         private IDictionary<MethodInfo, TaskDefinition> TaskDefinitionsByMethod { get; }
             = new Dictionary<MethodInfo, TaskDefinition>();
+
+        public IEnumerable<TaskDefinition> TaskDefinitions { get; }
 
         public TaskRegistry(ILogger<TaskRegistry> logger, IOptions<TaskServiceOptions> options)
         {
@@ -24,6 +26,8 @@ namespace QueueT.Tasks
             {
                 AddTask(taskDefinition);
             }
+
+            TaskDefinitions = new Dictionary<string, TaskDefinition>.ValueCollection(TaskDefinitionsByName);
         }
 
         public void AddTask(TaskDefinition taskDefinition)
