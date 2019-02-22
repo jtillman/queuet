@@ -56,7 +56,7 @@ namespace QueueT.Notifications
                 .SelectMany(assembly => assembly.GetTypes())
                 .Where(type => type.IsClass)
                 .SelectMany(type=>type.GetMethods())
-                .Select(methodInfo => new { methodInfo, attribute = methodInfo.GetCustomAttribute<SubscriptionAttribute>(false) })
+                .SelectMany(methodInfo => methodInfo.GetCustomAttributes<SubscriptionAttribute>(false).Select(attribute=> new { methodInfo, attribute }))
                 .Where(entry => null != entry.attribute)
                 .ToList()
                 .ForEach(entry => options.RegisterSubscription(
