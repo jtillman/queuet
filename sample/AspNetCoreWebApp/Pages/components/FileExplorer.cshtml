@@ -1,0 +1,101 @@
+﻿<script id="file-explorer-template" type="text/x-template">
+    <div class="ui vertical inverted menu">
+
+        <div class="item">
+            <div class="ui vertical icon buttons">
+                <button class="ui green labeled icon button"
+                        v-on:click="showNewFileDialog()">
+                    <i class="add icon"></i>
+                    Add New File
+                </button>
+                <button class="ui blue labeled icon button" v-on:click="refreshFiles();">
+                    <i class="refresh icon"></i>
+                    Refresh Files
+                </button>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ui inverted vertical menu">
+                <a class="item"
+                   v-for="file in files"
+                   v-on:click="selectFile(file)"
+                   v-bind:class="{ active: file == selectedFile }">{{  file.name }}</a>
+            </div>
+        </div>
+
+        <div ref="newFileDialog" class="ui modal">
+            <div class="header">New File</div>
+            <div class="content">
+                <form class="ui form">
+                    <div class="field">
+                        <input type="text"
+                               name="fileName"
+                               placeholder="File Name"
+                               v-model="newFileName" />
+                    </div>
+                </form>
+            </div>
+            <div class="actions">
+                <div class="ui approve button" v-on:click="createNewFile(newFileName)">Create</div>
+                <div class="ui cancel button" v-on:click="closeNewFileDialog()">Cancel</div>
+            </div>
+        </div>
+    </div>
+</script>
+
+<script type="text/javascript">
+
+    var @ViewData.GetComponentName() = Vue.component("file-explorer", {
+        template: "#file-explorer-template",
+        data() {
+            return {
+                files: [],
+                newFileName: null,
+                selectedFile: null
+            };
+        },
+        mounted() {
+            this.refreshFiles();
+        },
+        methods: {
+            closeNewFileDialog() {
+                $(this.$refs.newFileDialog).modal("hide");
+            },
+            createNewFile(fileName) {
+                var vm = this;
+                vm.$http
+                    .post("/api/files/", {
+                        name: fileName,
+                        directoryId: null,
+                        content: "using System; nampace Prog{ public class Program {} }"
+                    })
+                    .then(function (response) {
+                        vm.closeNewFileDialog();
+                        vm.files.push(response.data);
+                        vm.selectFile(response.data);
+                    });
+            },
+            selectFile(file) {
+                if (this.selectFile == file)
+                    return;
+
+                this.selectedFile = file;
+                this.$emit("file-selected", file);
+                // Emit that file was selected;
+            },
+            refreshFiles() {
+                var vm = this;
+                vm.$http
+                    .get("api/files/")
+                    .then(function (response) {
+                        vm.files = response.data.items;
+                    });
+            },
+            showNewFileDialog() {
+                this.newFileName = "Class.cs";
+                $(this.$refs.newFileDialog).modal("show");
+            }
+        }
+    });
+</script>

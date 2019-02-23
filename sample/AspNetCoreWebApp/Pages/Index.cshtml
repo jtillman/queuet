@@ -1,167 +1,112 @@
 ﻿@page
 @model IndexModel
 @{
-    ViewData["Title"] = "QueueT Queues";
+    ViewData["Title"] = "Browser Studio";
+    Layout = "~/Pages/Shared/_Semantic.cshtml";
 }
 
-<div id="app" class="row">
-    <div class="col-4">
-        <div>
-            <h2>Queues</h2>
-        </div>
-        <div class="list-group">
-            <div v-for="queue in queues"
-                 class="list-group-item">
-                <div class="d-flex w-100 justify-content-between">
-                    <h5 class="mb-1">{{ queue.name }}</h5>
-                    <small>{{ queue.length }} Items</small>
-                </div>
-                <div class="d-flex w-100 justify-content-between">
-                    <div class="custom-control custom-switch">
-                        <input :id="'listen_' + queue.name"
-                               type="checkbox"
-                               class="custom-control-input"
-                               v-model="queue.monitored"
-                               v-on:click="setQueueMonitoring(queue, !queue.monitored)">
-                        <label class="custom-control-label" :for="'listen_' + queue.name">
-                            <span v-if="queue.monitored">Listening</span>
-                            <span v-else>Not Listening</span>
-                        </label>
-                    </div>
-                </div>
+<div id="fileSystemEditor" class="ui black full-height fluid container">
+    <file-change-explorer ref="fileChangeExplorer" v-on:file-change-selected="fileChangeSelected($event)"></file-change-explorer>
+
+    <div class="ui inverted segment" style="margin-top: 80px;">
+        <div class="ui internal attached left rail">
+            <div class="ui inverted segment">
+                <file-explorer ref="fileExplorer" v-on:file-selected="fileSelected($event)"></file-explorer>
             </div>
         </div>
-        <br/>
-        <div class="d-flex w-100 justify-content-between">
-            <div class="custom-control custom-switch">
-                <input id="queueAutoUpdate"
-                       type="checkbox"
-                       class="custom-control-input"
-                       v-on:click="setAutoUpdateQueues(null == queueTimer)">
-                <label class="custom-control-label" for="queueAutoUpdate">Auto Update</label>
+
+        <div class="ui internal attached right rail">
+            <div class="ui inverted segement">
+                <queue-controls></queue-controls>
             </div>
         </div>
-    </div>
-
-    <div class="col-8">
-        <h2>
-            Tasks
-            <div v-if="tasksLoading" class="spinner-border" role="status">
-                <span class="sr-only">Loading...</span>
-            </div>
-        </h2>
-        <form v-if="!tasksLoading">
-            <div class="form-group">
-                <select class="form-control" id="taskSelector" v-model="selectedTask">
-                    <option disabled :value="null">Select A Task</option>
-                    <option v-for="task in tasks" :value="task">{{ task.name }}</option>
-                </select>
-            </div>
-
-            <div v-if="selectedTask" class="form-group">
-                <label for="taskArguments">Arguments</label>
-                <textarea ref="argumentTextArea" class="form-control" v-on:input="argumentsChanged($event)"></textarea>
-            </div>
-        </form>
-
-        <div class="dropdown">
-            <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton"
-                    data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
-                    :disabled="!selectedTask">
-                Dispatch To
-            </button>
-            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                <a v-for="queue in queues"
-                   class="dropdown-item"
-                   v-on:click="dispatchTask(selectedTask, queue.name)">{{ queue.name }}</a>
-            </div>
+        <div class="ui container">
+            <file-change-editor ref="fileChangeEditor"></file-change-editor>
         </div>
     </div>
 </div>
+@section Scripts{
 
-@section Scripts
-{
+    @await Html.PartialComponentAsync(
+    "FileChangeExplorer",
+    "FileChangeEditor",
+    "FileExplorer",
+    "QueueControls")
+
+    <!-- Include SignalR Client Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@@aspnet/signalr@1.1.2/dist/browser/signalr.min.js"></script>
+
+    <!-- Include the Codemirror library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.32.0/codemirror.min.js"></script>
+
+    <!-- Codemirror JS Vue -->
+    <script src="https://cdn.jsdelivr.net/npm/vue-codemirror@4.0.0/dist/vue-codemirror.js"></script>
+    <!-- Codemirror Libs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.32.0/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.32.0/mode/meta.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.32.0/addon/merge/merge.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.32.0/addon/selection/active-line.min.js"></script>
+    <!-- Google diff match patch -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js"></script>
+    <script>
+        window.DIFF_DELETE = -1
+        window.DIFF_INSERT = 1
+        window.DIFF_EQUAL = 0
+    </script>
+    <!-- Include stylesheet -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.32.0/codemirror.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.32.0/addon/merge/merge.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.32.0/theme/monokai.min.css" rel="stylesheet">
+
+
     <script type="text/javascript">
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/hubs/workspace")
+            .build();
+
+
+        Vue.use(VueCodemirror);
+
         var app = new Vue({
-            el: '#app',
+            el: "#fileSystemEditor",
             data: {
-                arguments: "",
-                queues: [],
-                queuesLoading: false,
-                queueTimer: null,
-                selectedTask: null,
-                tasks: [],
-                tasksLoading: false
+                splitIndex: 0,
+                splitSizes: [
+                    { menu: "two wide", editor: "fourteen wide" },
+                    { menu: "three wide", editor: "thirteen wide" },
+                    { menu: "four wide", editor: "twelve wide" },
+                    { menu: "five wide", editor: "eleven wide" },
+                    { menu: "six wide", editor: "ten wide" },
+                    { menu: "seven wide", editor: "nine wide" },
+                    { menu: "eight wide", editor: "eight wide" }
+                ],
+                cmOptions: {
+                    tabSize: 4,
+                    styleActiveLine: true,
+                    lineNumbers: true,
+                    mode: 'text/javascript',
+                    theme: "monokai"
+                },
             },
             created() {
-                this.loadQueues();
-                this.loadTasks();
             },
             methods: {
-                argumentsChanged: function (evnt) {
-                    var control = this.$refs.argumentTextArea;
-                    $(control)
-                        .css('height', 'auto')
-                        .css('height', control.scrollHeight + (control.offsetHeight - control.clientHeight));
-                    this.arguments = evnt.target.value;
+                fileChangeSelected(fileChange) {
+                    this.$refs.fileChangeEditor.setFileChange(fileChange);
                 },
-                setAutoUpdateQueues: function (autoUpdate) {
-                    if (!autoUpdate && this.queueTimer != null) {
-                        window.clearInterval(this.queueTimer);
-                        this.queueTimer = null;
-                    }
-                    else if (autoUpdate && null == this.queueTimer) {
-                        this.queueTimer = window.setInterval(this.loadQueues, 1000);
-                    }
+                fileSelected(file) {
+                    this.$refs.fileChangeExplorer.createFileChange(file.id);
                 },
-                setQueueMonitoring: function (queue, monitor) {
-                    var vm = this;
-                    vm.$http
-                        .put("api/queues/" + queue.name,
-                            { monitored: monitor }
-                        )
-                        .then(function (response) {
-                            queue.monitor = response.data.monitor
-                        })
-                },
-
-                loadQueues: function () {
-                    var vm = this;
-                    if (vm.queuesLoading)
-                        return;
-
-                    vm.queuesLoading = true;
-                    vm.$http
-                        .get("api/queues/")
-                        .then(function (response) {
-                            vm.queues = response.data.items;
-                            vm.queuesLoading = false;
-                        });
-                },
-
-                loadTasks: function () {
-                    var vm = this;
-                    if (vm.tasksLoading)
-                        return;
-
-                    vm.tasksLoading = true;
-                    vm.$http
-                        .get("api/tasks/")
-                        .then(function (response) {
-                            vm.tasks = response.data.items;
-                            vm.tasksLoading = false;
-                        });
-                },
-                dispatchTask: function (task, queueName) {
-                    var vm = this;
-
-                    vm.$http
-                        .post("api/tasks/" + task.name + "/delay", {
-                            queue: queueName,
-                            arguments: this.arguments
-                        });
+                fileStatusChanged(fileId, hash) {
+                    this.$refs.fileChangeEditor.refreshAnalysis();
                 }
             }
-        })
+        });
+
+        connection.on("FileStatusChanged", (fileId, hash) => {
+            app.fileStatusChanged(fileId, hash);
+        });
+
+        connection.start();
     </script>
 }

@@ -1,0 +1,108 @@
+﻿<script id="file-change-explorer-template" type="text/x-template">
+    <div class="ui inverted top fixed menu">
+        <div class="item">
+            <h1 class="ui inverted header">Browser Studio</h1>
+        </div>
+        <div v-for="fileChange in fileChanges"
+                class="item"
+                v-bind:class="{ active: fileChange == seletedFileChange}">
+            <div class="content">
+                <div class="ui buttons">
+                    <button v-on:click="selectFileChange(fileChange)"
+                            class="ui black button">
+                        {{ fileChange.fileName }}
+                    </button>
+                    <button  class="ui black icon button">
+                        <i class="save icon"></i>
+                    </button>
+                    <button v-on:click="closeFileChange(fileChange)"
+                            class="ui black icon button">
+                        <i class="close icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</script>
+
+<script type="text/javascript">
+    var @ViewData.GetComponentName() = Vue.component("file-change-explorer", {
+        template: "#file-change-explorer-template",
+        data() {
+            return {
+                fileChanges: [],
+                seletedFileChange: null
+            }
+        },
+        mounted() {
+            this.refreshFileChanges();
+        },
+        methods: {
+            refreshFileChanges() {
+                var vm = this;
+                vm.$http
+                    .get("api/fileedits/")
+                    .then(function (response) {
+                        vm.fileChanges = response.data.items;
+                        var newFileChangeFocus = null;
+
+                        if (vm.fileChanges.length > 0) {
+                            if (null != vm.selectedFileChange) {
+                                var updatedSelectedFile = vm.fileChanges.find((fc) => fc.fileId == vm.selectedFileChange.fileId);
+                                if (null != updatedSelectedFile) {
+                                    newFileChangeFocus = updatedSelectedFile;
+                                }
+                            } else {
+                                newFileChangeFocus = vm.fileChanges[0];
+                            }
+                        }
+
+                        vm.selectFileChange(newFileChangeFocus);
+                    });
+            },
+            selectFile(fileId) {
+                var vm = this;
+                var change = this.fileChanges.find((fc) => fc.fileId == fileId);
+            },
+            selectFileChange(fileChange) {
+                this.seletedFileChange = fileChange;
+                this.$emit('file-change-selected', fileChange);
+            },
+            createFileChange(fileId) {
+                var vm = this;
+                var change = vm.fileChanges.find((fc) => fc.fileId == fileId);
+
+                if (null != change) {
+                    if (vm.selectFileChange != change) {
+                        vm.selectFileChange(change);
+                    }
+                    return;
+                }
+
+                vm.$http
+                    .post("api/fileedits/", {
+                        fileId: fileId
+                    })
+                    .then((response) => {
+                        vm.fileChanges.push(response.data);
+                        vm.selectFileChange(response.data);
+                    });
+            },
+            saveFile(fileChange) {
+                var vm = this;
+                vm.$http
+                    .post("api/fileedits/" + fileChange.fileId + "/" + fileChange.hash + "/commit", {})
+                    .then((response) => {
+                        console.log("File Saved! - " + fileChange.fileName);
+                    });
+            },
+            closeFileChange(fileChange) {
+                var vm = this;
+                vm.$http
+                    .delete("api/fileedits/" + fileChange.fileId + "/" + fileChange.hash + "/", {})
+                    .then((response) => {
+                        vm.refreshFileChanges();
+                    });
+            }
+        }});
+</script>

@@ -1,0 +1,100 @@
+﻿<script id="file-change-editor-template" type="text/x-template">
+    <div v-if="fileChange">
+        <div class="ui inverted segment">
+            <codemirror v-model="fileChange.content"
+                        :options="cmOptions"
+                        v-on:input="updateFileChange(fileChange, $event)"></codemirror>
+        </div>
+        <div class="ui inverted segment">
+            <table v-if="fileAnalysis.length > 0" class="ui very inverted celled table">
+                <thead>
+                    <tr>
+                        <td class="collapsing">Severity</td>
+                        <td>Code</td>
+                        <td>Description</td>
+                        <td>Location</td>
+                    </tr>
+                </thead>
+                <tr v-for="analysis in fileAnalysis">
+                    <td>
+                        <i v-if="analysis.severity == 'Error'" class="red times circle icon"></i>
+                        <i v-else-if="analysis.severity == 'Warning'" class="yellow exclamation triangle icon"></i>
+                        <i v-else="analysis.severity == 'Info'" class="blue exclamation circle icon"></i>
+                    </td>
+                    <td>{{ analysis.id }}</td>
+                    <td>{{ analysis.description }}</td>
+                    <td>Line: {{ analysis.from.line + 1 }}, Column {{ analysis.from.character + 1}}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <h1 v-else class="ui inverted center aligned header">&lt;-- Add/Select a file....</h1>
+</script>
+
+<script type="text/javascript">
+    var @ViewData.GetComponentName() = Vue.component("file-change-editor", {
+        template: "#file-change-editor-template",
+        data() {
+            return {
+                fileChange: null,
+                fileAnalysis: [],
+                lastSavedContent: null,
+                cmOptions: {
+                    tabSize: 4,
+                    styleActiveLine: true,
+                    lineNumbers: true,
+                    mode: 'text/javascript',
+                    theme: "monokai"
+                }
+            }
+        },
+        methods: {
+            updateFileChange(fileChange, newContent) {
+                if (null == fileChange || this.lastSavedContent == newContent)
+                    return;
+
+                vm = this;
+                setTimeout(() => {
+                    if (fileChange.content != newContent)
+                        return;
+
+                    vm.$http
+                        .patch("api/fileedits/" + fileChange.fileId + "/" + fileChange.hash + "/", {
+                            content: newContent
+                        })
+                        .then((response) => {
+                            fileChange.hash = response.data.hash;
+                            vm.lastSavedContent = response.data.content;
+                        });
+                }, 2000);
+            },
+            setFileChange(fileChange){
+                var vm = this;
+                if (null != vm.fileChange)
+                {
+                    if (null != fileChange && fileChange.fileId == vm.fileChange){
+                        return;
+                    }
+                }
+
+                vm.fileChange = fileChange;
+                vm.fileAnalysis = [];
+                vm.editorContent = "";
+
+                if (null == vm.fileChange)
+                    return;
+
+                vm.lastSavedContent = vm.fileChange.content;
+                vm.refreshAnalysis();
+            },
+            refreshAnalysis() {
+                var vm = this;
+                vm.$http
+                    .get("api/fileanalysis/" + vm.fileChange.fileId + "/" + vm.fileChange.hash + "/")
+                    .then((response) => {
+                        vm.fileAnalysis = response.data;
+                    });
+            }
+        }
+    });
+</script>

@@ -1,0 +1,55 @@
+﻿<script  id="queue-controls-template" type="text/x-template">
+    <div class="ui inverted segment">
+        <div class="ui inverted vertical menu">
+            <a v-for="queue in queues" class="active item"
+                v-bind:class="{ red : !queue.monitored, green : queue.monitored }"
+                v-on:click="setQueueMonitoring(queue, !queue.monitored)">
+                <i class="mail icon"></i>{{ queue.name }}
+                <div class="ui label">{{ queue.length }}</div>
+            </a>
+        </div>
+    </div>
+</script>
+
+<script type="text/javascript">
+    var @ViewData.GetComponentName() = Vue.component("queue-controls", {
+        template: "#queue-controls-template",
+        data() {
+            return {
+                queues: [],
+                queuesLoading: false
+            }
+        },
+        created() {
+            this.loadQueues();
+            window.setInterval(this.loadQueues, 1000);
+        },
+        methods: {
+            loadQueues: function () {
+                var vm = this;
+                if (vm.queuesLoading)
+                    return;
+
+                vm.queuesLoading = true;
+                vm.$http
+                    .get("api/queues/")
+                    .then(function (response) {
+                        vm.queues = response.data.items;
+                        vm.queuesLoading = false;
+                    });
+            },
+            setQueueMonitoring: function (queue, monitor) {
+                var vm = this;
+                vm.$http
+                    .put("api/queues/" + queue.name,
+                        { monitored: monitor }
+                    )
+                    .then(function (response) {
+                        queue.monitored = response.data.monitored
+                    })
+            },
+        }
+    });
+</script>
+
+}

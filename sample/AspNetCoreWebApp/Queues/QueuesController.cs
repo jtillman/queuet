@@ -5,7 +5,7 @@ using QueueT;
 using QueueT.Brokers;
 using System.Linq;
 
-namespace AspNetCoreWebApp.Api
+namespace AspNetCoreWebApp.Queues
 {
     [Route("api/[controller]")]
     [ApiController]
