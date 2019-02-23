@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System;
 using System.Threading.Tasks;
 
@@ -8,6 +9,8 @@ namespace QueueT.Notifications
     {
         private readonly ILogger<NotificationService> _logger;
 
+        private readonly NotificationOptions _options;
+
         private readonly INotificationRegistry _notificationRegistry;
 
         private readonly IMessageDispatcher _messageDispatcher;
@@ -15,10 +18,12 @@ namespace QueueT.Notifications
 
         public NotificationService(
             ILogger<NotificationService> logger,
+            IOptions<NotificationOptions> options,
             INotificationRegistry notificationRegistry,
             IMessageDispatcher messageDispatcher)
         {
             _logger = logger;
+            _options = options.Value;
             _messageDispatcher = messageDispatcher;
             _notificationRegistry = notificationRegistry;
         }
@@ -30,7 +35,7 @@ namespace QueueT.Notifications
 
             options = options ?? new DispatchOptions();
             options.Properties[NotificationMessage.TopicPropertyKey] = notificationDefinition.Topic;
-
+            options.Queue = options.Queue ?? _options.DefaultQueueName;
             await _messageDispatcher.SendMessageAsync(NotificationMessage.MessageType, value, options);
         }
 

@@ -19,8 +19,6 @@ namespace QueueT.Notifications
 
         private readonly INotificationRegistry _notificationRegistry;
 
-        private readonly NotificationOptions _options;
-
         public NotificationMessageHandler(
             ILogger<NotificationMessageHandler> logger,
             IOptions<NotificationOptions> options,
@@ -28,7 +26,6 @@ namespace QueueT.Notifications
             ITaskService taskService)
         {
             _logger = logger;
-            _options = options.Value;
             _notificationRegistry = notificationRegistry;
             _taskService = taskService;
         }
@@ -51,7 +48,7 @@ namespace QueueT.Notifications
             foreach (var subscription in subscriptions)
             {
                 object taskArgument = null;
-                var options = new DispatchOptions { Queue = subscription.TaskQueue ?? _options.DefaultQueueName };
+                var options = new DispatchOptions { Queue = subscription.TaskQueue };
 
                 taskArgument = new Dictionary<string, object> { { subscription.MessageParameter.Name, argument } };
 
